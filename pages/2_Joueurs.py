@@ -61,8 +61,8 @@ def main() -> None:
             f"""
         **Configuration actuelle** :
         {len(active_players)} joueurs au total
-        - {requirements.triplette_count} donc {requirements.triplette_count * 3} joueurs en équipes de triplette
-        - {requirements.doublette_count} donc {requirements.doublette_count * 2} joueurs en équipes de doublette
+        - {requirements.triplette_count} équipe(s) donc {requirements.triplette_count * 3} joueurs en triplette
+        - {requirements.doublette_count} équipe(s) donc {requirements.doublette_count * 2} joueurs en doublette
 
         **Effectifs requis** :
         """
