@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 
-from src.petanque_manager.core.models import Match, Player, PlayerStats
+from src.petanque_manager.core.models import Match, Player, PlayerStats, TournamentMode
 
 
 def calculate_player_stats(
@@ -270,8 +270,8 @@ def get_tournament_summary(
     avg_points_per_match = total_points / len(completed_matches) if completed_matches else 0.0
 
     # Count formats
-    triplette_count = sum(1 for m in matches if m.format.value == "TRIPLETTE")
-    doublette_count = sum(1 for m in matches if m.format.value == "DOUBLETTE")
+    triplette_count = sum(1 for m in matches if m.format == TournamentMode.TRIPLETTE)
+    doublette_count = sum(1 for m in matches if m.format == TournamentMode.DOUBLETTE)
 
     return {
         "total_players": len(players),

@@ -77,24 +77,23 @@ def main() -> None:
                     - Mode : {config.mode.value}
                     - Joueurs : {len(players)}
                     - Terrains : {config.terrains_count}
-                    - Graine (seed) : {config.seed or "Aléatoire"}
                     """
                     )
 
-                    # Options de génération
-                    use_custom_seed = st.checkbox(
-                        "Utiliser une graine personnalisée pour cette manche",
-                        value=False,
-                        help="Remplace la graine globale uniquement pour cette manche",
-                    )
+                    # # Options de génération
+                    # use_custom_seed = st.checkbox(
+                    #     "Utiliser une graine personnalisée pour cette manche",
+                    #     value=False,
+                    #     help="Remplace la graine globale uniquement pour cette manche",
+                    # )
 
                     custom_seed = None
-                    if use_custom_seed:
-                        custom_seed = st.number_input(
-                            "Graine de la manche",
-                            min_value=0,
-                            value=0,
-                        )
+                    # if use_custom_seed:
+                    #     custom_seed = st.number_input(
+                    #         "Graine de la manche",
+                    #         min_value=0,
+                    #         value=0,
+                    #     )
 
                     if st.button("🎲 Générer la manche", type="primary"):
                         try:
@@ -102,9 +101,7 @@ def main() -> None:
                                 scheduler = TournamentScheduler(
                                     mode=config.mode,
                                     terrains_count=config.terrains_count,
-                                    seed=custom_seed
-                                    if use_custom_seed and custom_seed
-                                    else config.seed,
+                                    seed=custom_seed if custom_seed else config.seed,
                                 )
 
                                 round_obj, quality_report = scheduler.generate_round(

@@ -208,10 +208,6 @@ def main() -> None:
             3. **Procéder manche par manche** : terminez une manche avant de passer à la suivante
             4. **Vérifier avant d’enregistrer** : contrôlez les scores avant de cliquer sur Enregistrer
 
-            **Rappels des règles de score à la pétanque :**
-            - La première équipe à 13 points gagne
-            - Le score maximum est 13
-            - Scores fréquents : 13–0 à 13–12
             """
             )
 

@@ -87,7 +87,7 @@ def main() -> None:
     st.markdown(
         """
     Bienvenue dans le **Gestionnaire de tournoi de pétanque** ! Cette application vous aide à organiser
-    et gérer des tournois de pétanque avec deux modes : **TRIPLETTE** et **DOUBLETTE**.
+    et gérer des tournois de pétanque avec deux modes : **Triplette** et **Doublette**.
 
     ### Fonctionnalités
     - 📋 **Gestion des joueurs** : inscrire les joueurs avec leur rôle
@@ -159,22 +159,24 @@ def main() -> None:
             disabled=not can_edit,
         )
 
-        seed = st.number_input(
-            "Graine aléatoire (optionnel)",
-            min_value=0,
-            value=config.seed or 0,
-            help="Définir une graine pour reproduire la génération des manches (0 = aléatoire)",
-            disabled=not can_edit,
-        )
+        # seed = st.number_input(
+        #     "Graine aléatoire (optionnel)",
+        #     min_value=0,
+        #     value=config.seed or 0,
+        #     help="Définir une graine pour reproduire la génération des manches (0 = aléatoire)",
+        #     disabled=not can_edit,
 
-    storage_backend = st.selectbox(
-        "Backend de stockage",
-        options=[StorageBackend.SQLMODEL, StorageBackend.JSON],
-        index=0 if config.storage_backend == StorageBackend.SQLMODEL else 1,
-        help="SQLModel : base SQLite (recommandé)\nJSON : stockage en fichier (secours)",
-        disabled=not can_edit,
-    )
+        # )
 
+    # storage_backend = st.selectbox(
+    #     "Backend de stockage",
+    #     options=[StorageBackend.SQLMODEL, StorageBackend.JSON],
+    #     index=0 if config.storage_backend == StorageBackend.SQLMODEL else 1,
+    #     help="SQLModel : base SQLite (recommandé)\nJSON : stockage en fichier (secours)",
+    #     disabled=not can_edit,
+    # )
+    storage_backend = StorageBackend.SQLMODEL
+    seed = config.seed or 0
     if can_edit:
         if st.button("💾 Enregistrer la configuration", type="primary"):
             new_config = TournamentConfig(
@@ -191,7 +193,7 @@ def main() -> None:
 
     # Affichage configuration actuelle
     st.subheader("Configuration actuelle")
-    config_col1, config_col2, config_col3 = st.columns(3)
+    config_col1, config_col2 = st.columns(2)
 
     with config_col1:
         st.metric("Mode", config.mode.value)
@@ -201,8 +203,8 @@ def main() -> None:
         st.metric("Manches", config.rounds_count)
         st.metric("Graine", config.seed or "Aléatoire")
 
-    with config_col3:
-        st.metric("Stockage", config.storage_backend.value)
+        # with config_col3:
+        #     st.metric("Stockage", config.storage_backend.value)
 
         # Infos stockage
         if config.storage_backend == StorageBackend.SQLMODEL:
@@ -253,7 +255,7 @@ def main() -> None:
                 tireur_count = sum(1 for p in players if p.role == PlayerRole.TIREUR)
                 delta = tireur_count - requirements.tireur_needed
                 st.metric(
-                    "TIREUR",
+                    PlayerRole.TIREUR.value,
                     f"{tireur_count} / {requirements.tireur_needed}",
                     delta=f"{delta:+d}" if delta != 0 else "OK",
                     delta_color="off" if delta == 0 else "normal",
@@ -264,7 +266,7 @@ def main() -> None:
                 pointeur_count = sum(1 for p in players if p.role == PlayerRole.POINTEUR)
                 delta = pointeur_count - requirements.pointeur_needed
                 st.metric(
-                    "POINTEUR",
+                    PlayerRole.POINTEUR.value,
                     f"{pointeur_count} / {requirements.pointeur_needed}",
                     delta=f"{delta:+d}" if delta != 0 else "OK",
                     delta_color="off" if delta == 0 else "normal",
@@ -275,18 +277,16 @@ def main() -> None:
                 milieu_count = sum(1 for p in players if p.role == PlayerRole.MILIEU)
                 delta = milieu_count - requirements.milieu_needed
                 st.metric(
-                    "MILIEU",
+                    PlayerRole.MILIEU.value,
                     f"{milieu_count} / {requirements.milieu_needed}",
                     delta=f"{delta:+d}" if delta != 0 else "OK",
                     delta_color="off" if delta == 0 else "normal",
                 )
             else:
-                pointeur_milieu_count = sum(
-                    1 for p in players if p.role == PlayerRole.POINTEUR_MILIEU
-                )
+                pointeur_milieu_count = sum(1 for p in players if p.role == PlayerRole.POINTEUR)
                 delta = pointeur_milieu_count - requirements.pointeur_milieu_needed
                 st.metric(
-                    "POINTEUR_MILIEU",
+                    PlayerRole.POINTEUR.value,
                     f"{pointeur_milieu_count} / {requirements.pointeur_milieu_needed}",
                     delta=f"{delta:+d}" if delta != 0 else "OK",
                     delta_color="off" if delta == 0 else "normal",
@@ -297,7 +297,7 @@ def main() -> None:
                 tireur_count = sum(1 for p in players if p.role == PlayerRole.TIREUR)
                 delta = tireur_count - requirements.tireur_needed
                 st.metric(
-                    "TIREUR",
+                    PlayerRole.TIREUR.value,
                     f"{tireur_count} / {requirements.tireur_needed}",
                     delta=f"{delta:+d}" if delta != 0 else "OK",
                     delta_color="off" if delta == 0 else "normal",
