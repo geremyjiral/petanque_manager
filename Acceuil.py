@@ -12,6 +12,7 @@ from src.petanque_manager.core.models import (
     TournamentConfig,
     TournamentMode,
 )
+from src.petanque_manager.core.scheduler import calculate_role_requirements
 from src.petanque_manager.infra.auth import is_authenticated, show_login_form
 from src.petanque_manager.infra.storage import TournamentStorage
 from src.petanque_manager.infra.storage_json import JSONStorage
@@ -197,20 +198,8 @@ def main() -> None:
 
     with config_col1:
         st.metric("Mode", config.mode.value)
-        st.metric("Terrains", config.terrains_count)
-
     with config_col2:
-        st.metric("Manches", config.rounds_count)
-        st.metric("Graine", config.seed or "Aléatoire")
-
-        # with config_col3:
-        #     st.metric("Stockage", config.storage_backend.value)
-
-        # Infos stockage
-        if config.storage_backend == StorageBackend.SQLMODEL:
-            st.caption(f"📁 BD : `{config.db_path}`")
-        else:
-            st.caption(f"📁 JSON : `{config.json_path}`")
+        st.metric("Terrains", config.terrains_count)
 
     # Statistiques rapides
     st.header("📊 Statistiques rapides")
@@ -236,8 +225,6 @@ def main() -> None:
 
     # Besoins en rôles
     if players:
-        from src.petanque_manager.core.scheduler import calculate_role_requirements
-
         st.subheader("📋 Besoins par rôle")
 
         requirements = calculate_role_requirements(config.mode, len(players))
