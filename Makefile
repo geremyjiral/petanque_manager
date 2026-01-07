@@ -13,7 +13,7 @@ dev: ## Install all dependencies (including dev)
 	uv sync --all-extras
 
 run: ## Run the Streamlit application
-	uv run streamlit run app.py
+	uv run streamlit run Acceuil.py
 
 test: ## Run tests
 	uv run pytest

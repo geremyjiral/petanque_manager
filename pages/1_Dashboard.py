@@ -1,83 +1,83 @@
-"""Dashboard page with tournament overview and statistics."""
+"""Page Tableau de bord avec aperçu et statistiques du tournoi."""
 
 from typing import Any
 
 import pandas as pd
 import streamlit as st
 
-from app import get_storage
+from Acceuil import get_storage
 from src.core.stats import get_tournament_summary
 from src.infra.auth import show_login_form
 
 
 def main() -> None:
     st.set_page_config(
-        page_title="Dashboard - Pétanque Tournament",
+        page_title="Tableau de bord - Tournoi de pétanque",
         page_icon="📊",
         layout="wide",
     )
 
     show_login_form()
 
-    st.title("📊 Tournament Dashboard")
+    st.title("📊 Tableau de bord du tournoi")
 
     storage = get_storage()
     config = storage.load_config()
 
     if config is None:
-        st.warning("⚠️ Please configure the tournament on the home page first.")
+        st.warning("⚠️ Veuillez d’abord configurer le tournoi sur la page d’accueil.")
         st.stop()
 
-    # Get data
+    # Récupération des données
     players = storage.get_all_players(active_only=True)
     all_rounds = storage.get_all_rounds()
     all_matches = storage.get_all_matches()
 
-    # Summary statistics
+    # Statistiques de synthèse
     summary = get_tournament_summary(players, all_matches)
 
-    st.header("📈 Tournament Overview")
+    st.header("📈 Vue d’ensemble du tournoi")
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("Total Players", summary["total_players"])
-        st.metric("Active Players", summary["active_players"])
+        st.metric("Nombre total de joueurs", summary["total_players"])
+        st.metric("Joueurs actifs", summary["active_players"])
 
     with col2:
-        st.metric("Total Matches", summary["total_matches"])
-        st.metric("Completed Matches", summary["completed_matches"])
+        st.metric("Matchs au total", summary["total_matches"])
+        st.metric("Matchs terminés", summary["completed_matches"])
 
     with col3:
-        st.metric("Total Rounds", len(all_rounds))
-        st.metric("Pending Matches", summary["pending_matches"])
+        st.metric("Nombre de manches", len(all_rounds))
+        st.metric("Matchs en attente", summary["pending_matches"])
 
     with col4:
-        st.metric("Total Points", summary["total_points_scored"])
-        st.metric("Avg Points/Match", summary["avg_points_per_match"])
+        st.metric("Total des points marqués", summary["total_points_scored"])
+        st.metric("Moyenne de points / match", summary["avg_points_per_match"])
 
-    # Match format distribution
-    st.subheader("🎯 Match Format Distribution")
+    # Répartition des formats de matchs
+    st.subheader("🎯 Répartition des formats de matchs")
 
     format_col1, format_col2 = st.columns(2)
 
     with format_col1:
         st.metric(
-            "Triplette Matches",
+            "Matchs en triplette",
             summary["triplette_matches"],
-            help="3v3 matches",
+            help="Matchs en 3 contre 3",
         )
 
     with format_col2:
         st.metric(
-            "Doublette Matches",
+            "Matchs en doublette",
             summary["doublette_matches"],
-            help="2v2 matches",
+            help="Matchs en 2 contre 2",
         )
 
-    # Round-by-round statistics
+    # Statistiques manche par manche
     if all_rounds:
-        st.header("📅 Round-by-Round Progress")
+        st.header("📅 Avancement par manche")
 
         round_data: list[dict[str, str | int]] = []
         for round_obj in all_rounds:
@@ -87,40 +87,42 @@ def main() -> None:
 
             round_data.append(
                 {
-                    "Round": f"Round {round_obj.index + 1}",
-                    "Total Matches": total,
-                    "Completed": completed,
-                    "Pending": total - completed,
-                    "Completion %": f"{completion_pct:.0f}%",
-                    "Players": round_obj.total_players,
+                    "Manche": f"Manche {round_obj.index + 1}",
+                    "Matchs au total": total,
+                    "Terminés": completed,
+                    "En attente": total - completed,
+                    "Avancement %": f"{completion_pct:.0f}%",
+                    "Joueurs": round_obj.total_players,
                 }
             )
 
         df_rounds = pd.DataFrame(round_data)
         st.dataframe(df_rounds, width="stretch", hide_index=True)  # pyright: ignore[reportUnknownMemberType]
 
-        # Progress bar
+        # Barre de progression globale
         total_matches = summary["total_matches"]
         completed_matches = summary["completed_matches"]
         if total_matches > 0:
             progress = completed_matches / total_matches
-            st.progress(progress, text=f"Overall Progress: {progress * 100:.1f}%")
+            st.progress(progress, text=f"Progression globale : {progress * 100:.1f}%")
 
     else:
-        st.info("📅 No rounds generated yet. Go to the Schedule page to generate rounds.")
+        st.info(
+            "📅 Aucune manche générée pour le moment. Allez sur la page Planning pour générer les manches."
+        )
 
-    # Recent activity
-    st.header("🕐 Recent Activity")
+    # Activité récente
+    st.header("🕐 Activité récente")
 
     if all_matches:
         list_completed_matches = [m for m in all_matches if m.is_complete]
 
         if list_completed_matches:
-            # Show last 5 completed matches
+            # Afficher les 5 derniers matchs terminés
             recent = list_completed_matches[-5:]
             recent_data: list[dict[str, str]] = []
             for match in reversed(recent):
-                # Get player names
+                # Noms des joueurs
                 team_a_names: list[str] = []
                 team_b_names: list[str] = []
 
@@ -136,36 +138,36 @@ def main() -> None:
 
                 recent_data.append(
                     {
-                        "Round": f"R{match.round_index + 1}",
+                        "Manche": f"M{match.round_index + 1}",
                         "Terrain": match.terrain_label,
-                        "Team A": ", ".join(team_a_names),
+                        "Équipe A": ", ".join(team_a_names),
                         "Score": f"{match.score_a} - {match.score_b}",
-                        "Team B": ", ".join(team_b_names),
-                        "Winner": "Team A"
+                        "Équipe B": ", ".join(team_b_names),
+                        "Vainqueur": "Équipe A"
                         if (match.score_a or 0) > (match.score_b or 0)
-                        else "Team B"
+                        else "Équipe B"
                         if (match.score_b or 0) > (match.score_a or 0)
-                        else "Draw",
+                        else "Match nul",
                     }
                 )
 
             df_recent = pd.DataFrame(recent_data)
             st.dataframe(df_recent, width="stretch", hide_index=True)  # pyright: ignore[reportUnknownMemberType]
         else:
-            st.info("No completed matches yet.")
+            st.info("Aucun match terminé pour le moment.")
     else:
-        st.info("No matches generated yet.")
+        st.info("Aucun match généré pour le moment.")
 
-    # Player role distribution
+    # Répartition des rôles des joueurs
     if players:
-        st.header("👥 Player Role Distribution")
+        st.header("👥 Répartition des rôles des joueurs")
 
         from collections import Counter
 
         role_counts = Counter(p.role.value for p in players)
 
         role_data: list[dict[str, Any]] = [
-            {"Role": role, "Count": count} for role, count in role_counts.items()
+            {"Rôle": role, "Nombre": count} for role, count in role_counts.items()
         ]
         df_roles = pd.DataFrame(role_data)
 
@@ -175,11 +177,12 @@ def main() -> None:
             st.dataframe(df_roles, width="stretch", hide_index=True)  # pyright: ignore[reportUnknownMemberType]
 
         with col2:
-            # Simple bar chart
-            st.bar_chart(df_roles.set_index("Role"))  # pyright: ignore[reportUnknownMemberType]
+            st.bar_chart(df_roles.set_index("Rôle"))  # pyright: ignore[reportUnknownMemberType]
 
     st.markdown("---")
-    st.caption("Dashboard updates in real-time as matches are completed.")
+    st.caption(
+        "Le tableau de bord se met à jour en temps réel à mesure que les matchs sont saisis."
+    )
 
 
 if __name__ == "__main__":

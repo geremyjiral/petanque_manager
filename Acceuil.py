@@ -1,20 +1,20 @@
-"""Main Streamlit application for pétanque tournament management.
+"""Application Streamlit principale pour la gestion d’un tournoi de pétanque.
 
-This is the home page and configuration interface.
-Run with: streamlit run app.py
+Ceci est la page d’accueil et l’interface de configuration.
+Lancer avec : streamlit run app.py
 """
 
 import streamlit as st
 
-from src.core.models import StorageBackend, TournamentConfig, TournamentMode
+from src.core.models import PlayerRole, StorageBackend, TournamentConfig, TournamentMode
 from src.infra.auth import is_authenticated, show_login_form
 from src.infra.storage import TournamentStorage
 from src.infra.storage_json import JSONStorage
 from src.infra.storage_sqlmodel import SQLModelStorage
 
-# Page config
+# Configuration de la page
 st.set_page_config(
-    page_title="Pétanque Tournament Manager",
+    page_title="Gestionnaire de tournoi de pétanque",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -22,13 +22,13 @@ st.set_page_config(
 
 
 def get_storage() -> TournamentStorage:
-    """Get or create storage instance.
+    """Récupère ou crée une instance de stockage.
 
     Returns:
-        Storage instance (cached in session state)
+        Instance de stockage (mise en cache dans le session state)
     """
     if "storage" not in st.session_state:
-        # Load or create default config
+        # Charger ou créer la config par défaut
         config = load_or_create_config()
 
         if config.storage_backend == StorageBackend.SQLMODEL:
@@ -43,12 +43,12 @@ def get_storage() -> TournamentStorage:
 
 
 def load_or_create_config() -> TournamentConfig:
-    """Load existing config or create default.
+    """Charge la configuration existante ou crée une configuration par défaut.
 
     Returns:
-        Tournament configuration
+        Configuration du tournoi
     """
-    # Try both backends
+    # Essayer les deux backends
     storages: list[tuple[type[TournamentStorage], str]] = [
         (SQLModelStorage, "tournament.db"),
         (JSONStorage, "tournament_data.json"),
@@ -63,7 +63,7 @@ def load_or_create_config() -> TournamentConfig:
         except Exception:
             continue
 
-    # Create default config
+    # Configuration par défaut
     return TournamentConfig(
         mode=TournamentMode.TRIPLETTE,
         rounds_count=3,
@@ -73,39 +73,39 @@ def load_or_create_config() -> TournamentConfig:
 
 
 def main() -> None:
-    """Main application entry point."""
-    # Show login form in sidebar
+    """Point d’entrée principal de l’application."""
+    # Formulaire de connexion dans la sidebar
     show_login_form()
 
-    st.title("🎯 Pétanque Tournament Manager")
+    st.title("🎯 Gestionnaire de tournoi de pétanque")
 
     st.markdown(
         """
-    Welcome to the **Pétanque Tournament Manager**! This application helps you organize
-    and manage pétanque tournaments with two modes: **TRIPLETTE** and **DOUBLETTE**.
+    Bienvenue dans le **Gestionnaire de tournoi de pétanque** ! Cette application vous aide à organiser
+    et gérer des tournois de pétanque avec deux modes : **TRIPLETTE** et **DOUBLETTE**.
 
-    ### Features
-    - 📋 **Player Management**: Register players with their roles
-    - 📅 **Smart Scheduling**: Generate rounds with constraint satisfaction
-    - 📊 **Live Rankings**: Track wins, points, and goal averages
-    - 🎲 **Fair Matchmaking**: Minimize repeated partners, opponents, and terrains
-    - 🔒 **Public Viewing**: Anyone can view schedules and rankings
-    - ✏️ **Admin Editing**: Login required for player management and result entry
+    ### Fonctionnalités
+    - 📋 **Gestion des joueurs** : inscrire les joueurs avec leur rôle
+    - 📅 **Planning intelligent** : générer des manches en respectant des contraintes
+    - 📊 **Classement en direct** : suivre les victoires, les points et le goal-average
+    - 🎲 **Matchmaking équitable** : minimiser les partenaires, adversaires et terrains répétés
+    - 🔒 **Consultation publique** : tout le monde peut voir le planning et le classement
+    - ✏️ **Édition admin** : connexion requise pour gérer les joueurs et saisir les résultats
 
     ### Navigation
-    Use the sidebar to navigate between pages:
-    - **Dashboard**: Tournament overview and statistics
-    - **Players**: Manage player roster (requires login)
-    - **Schedule**: Generate and view rounds
-    - **Results**: Enter match results (requires login)
-    - **Ranking**: View player standings
+    Utilisez la barre latérale pour naviguer entre les pages :
+    - **Tableau de bord** : aperçu du tournoi et statistiques
+    - **Joueurs** : gérer la liste des joueurs (connexion requise)
+    - **Planning** : générer et consulter les manches
+    - **Résultats** : saisir les résultats des matchs (connexion requise)
+    - **Classement** : consulter le classement des joueurs
 
     ---
     """
     )
 
-    # Configuration section
-    st.header("⚙️ Tournament Configuration")
+    # Section configuration
+    st.header("⚙️ Configuration du tournoi")
 
     storage = get_storage()
     config = storage.load_config()
@@ -113,61 +113,65 @@ def main() -> None:
     if config is None:
         config = TournamentConfig()
 
-    # Only allow editing if authenticated
+    # Édition uniquement si authentifié
     can_edit = is_authenticated()
 
     if not can_edit:
-        st.info("🔒 Tournament configuration is view-only. Please login to change settings.")
+        st.info(
+            "🔒 La configuration du tournoi est en lecture seule. Connectez-vous pour modifier les paramètres."
+        )
 
     col1, col2 = st.columns(2)
 
     with col1:
-        mode = st.selectbox(
-            "Tournament Mode",
-            options=[TournamentMode.TRIPLETTE, TournamentMode.DOUBLETTE],
-            index=0 if config.mode == TournamentMode.TRIPLETTE else 1,
-            help="TRIPLETTE: 3 players per team (preferred)\n"
-            "DOUBLETTE: 2 players per team (preferred)",
-            disabled=not can_edit,
+        mode = TournamentMode(
+            st.selectbox(
+                "Mode du tournoi",
+                options=[TournamentMode.TRIPLETTE.value, TournamentMode.DOUBLETTE.value],
+                index=0 if config.mode == TournamentMode.TRIPLETTE else 1,
+                help="TRIPLETTE : 3 joueurs par équipe (prioritaire)\n"
+                "DOUBLETTE : 2 joueurs par équipe (prioritaire)",
+                disabled=not can_edit,
+            )
         )
 
         terrains_count = st.number_input(
-            "Number of Terrains",
+            "Nombre de terrains",
             min_value=1,
             max_value=52,
             value=config.terrains_count,
-            help="Number of available playing terrains (e.g., 8 for A-H)",
+            help="Nombre de terrains disponibles (ex. 8 pour A–H)",
             disabled=not can_edit,
         )
 
     with col2:
         rounds_count = st.number_input(
-            "Number of Rounds",
+            "Nombre de manches",
             min_value=1,
             max_value=10,
             value=config.rounds_count,
-            help="Total number of rounds to play",
+            help="Nombre total de manches à jouer",
             disabled=not can_edit,
         )
 
         seed = st.number_input(
-            "Random Seed (optional)",
+            "Graine aléatoire (optionnel)",
             min_value=0,
             value=config.seed or 0,
-            help="Set a seed for reproducible round generation (0 = random)",
+            help="Définir une graine pour reproduire la génération des manches (0 = aléatoire)",
             disabled=not can_edit,
         )
 
     storage_backend = st.selectbox(
-        "Storage Backend",
+        "Backend de stockage",
         options=[StorageBackend.SQLMODEL, StorageBackend.JSON],
         index=0 if config.storage_backend == StorageBackend.SQLMODEL else 1,
-        help="SQLModel: SQLite database (recommended)\nJSON: File-based storage (fallback)",
+        help="SQLModel : base SQLite (recommandé)\nJSON : stockage en fichier (secours)",
         disabled=not can_edit,
     )
 
     if can_edit:
-        if st.button("💾 Save Configuration", type="primary"):
+        if st.button("💾 Enregistrer la configuration", type="primary"):
             new_config = TournamentConfig(
                 mode=mode,
                 rounds_count=int(rounds_count),
@@ -177,11 +181,11 @@ def main() -> None:
             )
 
             storage.save_config(new_config)
-            st.success("✅ Configuration saved!")
+            st.success("✅ Configuration enregistrée !")
             st.rerun()
 
-    # Display current configuration
-    st.subheader("Current Configuration")
+    # Affichage configuration actuelle
+    st.subheader("Configuration actuelle")
     config_col1, config_col2, config_col3 = st.columns(3)
 
     with config_col1:
@@ -189,20 +193,20 @@ def main() -> None:
         st.metric("Terrains", config.terrains_count)
 
     with config_col2:
-        st.metric("Rounds", config.rounds_count)
-        st.metric("Seed", config.seed or "Random")
+        st.metric("Manches", config.rounds_count)
+        st.metric("Graine", config.seed or "Aléatoire")
 
     with config_col3:
-        st.metric("Storage", config.storage_backend.value)
+        st.metric("Stockage", config.storage_backend.value)
 
-        # Storage info
+        # Infos stockage
         if config.storage_backend == StorageBackend.SQLMODEL:
-            st.caption(f"📁 DB: `{config.db_path}`")
+            st.caption(f"📁 BD : `{config.db_path}`")
         else:
-            st.caption(f"📁 JSON: `{config.json_path}`")
+            st.caption(f"📁 JSON : `{config.json_path}`")
 
-    # Quick stats
-    st.header("📊 Quick Stats")
+    # Statistiques rapides
+    st.header("📊 Statistiques rapides")
 
     players = storage.get_all_players(active_only=True)
     rounds = storage.get_all_rounds()
@@ -212,28 +216,28 @@ def main() -> None:
     stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
 
     with stat_col1:
-        st.metric("Active Players", len(players))
+        st.metric("Joueurs actifs", len(players))
 
     with stat_col2:
-        st.metric("Rounds Generated", len(rounds))
+        st.metric("Manches générées", len(rounds))
 
     with stat_col3:
-        st.metric("Total Matches", len(matches))
+        st.metric("Matchs au total", len(matches))
 
     with stat_col4:
-        st.metric("Completed Matches", len(completed_matches))
+        st.metric("Matchs terminés", len(completed_matches))
 
-    # Role requirements
+    # Besoins en rôles
     if players:
         from src.core.scheduler import calculate_role_requirements
 
-        st.subheader("📋 Role Requirements")
+        st.subheader("📋 Besoins par rôle")
 
         requirements = calculate_role_requirements(config.mode, len(players))
 
         st.markdown(
             f"""
-        For **{len(players)} players** in **{config.mode.value}** mode:
+        Pour **{len(players)} joueurs** en mode **{config.mode.value}** :
         """
         )
 
@@ -241,7 +245,7 @@ def main() -> None:
 
         with req_col1:
             if config.mode == TournamentMode.TRIPLETTE:
-                tireur_count = sum(1 for p in players if p.role.value == "TIREUR")
+                tireur_count = sum(1 for p in players if p.role == PlayerRole.TIREUR)
                 delta = tireur_count - requirements.tireur_needed
                 st.metric(
                     "TIREUR",
@@ -252,7 +256,7 @@ def main() -> None:
 
         with req_col2:
             if config.mode == TournamentMode.TRIPLETTE:
-                pointeur_count = sum(1 for p in players if p.role.value == "POINTEUR")
+                pointeur_count = sum(1 for p in players if p.role == PlayerRole.POINTEUR)
                 delta = pointeur_count - requirements.pointeur_needed
                 st.metric(
                     "POINTEUR",
@@ -263,7 +267,7 @@ def main() -> None:
 
         with req_col3:
             if config.mode == TournamentMode.TRIPLETTE:
-                milieu_count = sum(1 for p in players if p.role.value == "MILIEU")
+                milieu_count = sum(1 for p in players if p.role == PlayerRole.MILIEU)
                 delta = milieu_count - requirements.milieu_needed
                 st.metric(
                     "MILIEU",
@@ -272,7 +276,9 @@ def main() -> None:
                     delta_color="off" if delta == 0 else "normal",
                 )
             else:
-                pointeur_milieu_count = sum(1 for p in players if p.role.value == "POINTEUR_MILIEU")
+                pointeur_milieu_count = sum(
+                    1 for p in players if p.role == PlayerRole.POINTEUR_MILIEU
+                )
                 delta = pointeur_milieu_count - requirements.pointeur_milieu_needed
                 st.metric(
                     "POINTEUR_MILIEU",
@@ -283,7 +289,7 @@ def main() -> None:
 
         with req_col4:
             if config.mode == TournamentMode.DOUBLETTE:
-                tireur_count = sum(1 for p in players if p.role.value == "TIREUR")
+                tireur_count = sum(1 for p in players if p.role == PlayerRole.TIREUR)
                 delta = tireur_count - requirements.tireur_needed
                 st.metric(
                     "TIREUR",
@@ -292,9 +298,11 @@ def main() -> None:
                     delta_color="off" if delta == 0 else "normal",
                 )
 
-    # Footer
+    # Pied de page
     st.markdown("---")
-    st.caption("Made with ❤️ for pétanque enthusiasts | 🔓 Public viewing • 🔒 Admin editing")
+    st.caption(
+        "Fait avec ❤️ pour les passionnés de pétanque | 🔓 Consultation publique • 🔒 Édition admin"
+    )
 
 
 if __name__ == "__main__":

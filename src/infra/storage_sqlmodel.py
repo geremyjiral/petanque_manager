@@ -17,6 +17,8 @@ from src.core.models import (
 )
 from src.infra.storage import TournamentStorage
 
+SQLModel.__table_args__ = {"extend_existing": True}
+
 
 # Database models (SQLModel ORM)
 class PlayerDB(SQLModel, table=True):

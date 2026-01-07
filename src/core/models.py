@@ -13,27 +13,27 @@ from pydantic import BaseModel, Field, field_validator
 class TournamentMode(str, Enum):
     """Tournament mode: TRIPLETTE or DOUBLETTE priority."""
 
-    TRIPLETTE = "TRIPLETTE"
-    DOUBLETTE = "DOUBLETTE"
+    TRIPLETTE = "Triplette"
+    DOUBLETTE = "Doublette"
 
 
 class MatchFormat(str, Enum):
     """Match format: triplette (3v3) or doublette (2v2)."""
 
-    TRIPLETTE = "TRIPLETTE"
-    DOUBLETTE = "DOUBLETTE"
+    TRIPLETTE = "Triplette"
+    DOUBLETTE = "Doublette"
 
 
 class PlayerRole(str, Enum):
     """Player roles in pétanque."""
 
     # Used in TRIPLETTE mode
-    TIREUR = "TIREUR"  # Shooter
-    POINTEUR = "POINTEUR"  # Pointer
-    MILIEU = "MILIEU"  # Middle player
+    TIREUR = "Tireur"  # Shooter
+    POINTEUR = "Pointeur"  # Pointer
+    MILIEU = "Milieu"  # Middle player
 
     # Used in DOUBLETTE mode (can also be used as fallback)
-    POINTEUR_MILIEU = "POINTEUR_MILIEU"  # Combined pointer/middle role
+    POINTEUR_MILIEU = "Pointeur/Milieu"  # Combined pointer/middle role
 
 
 class StorageBackend(str, Enum):

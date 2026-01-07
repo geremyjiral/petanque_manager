@@ -1,9 +1,9 @@
-"""Player management page."""
+"""Page de gestion des joueurs."""
 
 import pandas as pd
 import streamlit as st
 
-from app import get_storage
+from Acceuil import get_storage
 from src.core.models import Player, PlayerRole, TournamentMode
 from src.core.scheduler import calculate_role_requirements
 from src.infra.auth import is_authenticated, show_login_form
@@ -11,54 +11,57 @@ from src.infra.auth import is_authenticated, show_login_form
 
 def main() -> None:
     st.set_page_config(
-        page_title="Players - Pétanque Tournament",
+        page_title="Joueurs - Tournoi de pétanque",
         page_icon="👥",
         layout="wide",
     )
 
     show_login_form()
 
-    st.title("👥 Player Management")
+    st.title("👥 Gestion des joueurs")
 
     storage = get_storage()
     config = storage.load_config()
 
     if config is None:
-        st.warning("⚠️ Please configure the tournament on the home page first.")
+        st.warning("⚠️ Veuillez d’abord configurer le tournoi sur la page d’accueil.")
         st.stop()
 
     can_edit = is_authenticated()
 
     if not can_edit:
-        st.info("🔒 Player management requires login. You can view the roster below.")
+        st.info(
+            "🔒 La gestion des joueurs nécessite une connexion. "
+            "Vous pouvez consulter la liste des joueurs ci-dessous."
+        )
 
-    # Get all players
+    # Récupération des joueurs
     all_players = storage.get_all_players(active_only=False)
     active_players = [p for p in all_players if p.active]
 
-    # Show stats
+    # Statistiques joueurs
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("Total Players", len(all_players))
+        st.metric("Nombre total de joueurs", len(all_players))
 
     with col2:
-        st.metric("Active Players", len(active_players))
+        st.metric("Joueurs actifs", len(active_players))
 
     with col3:
-        st.metric("Inactive Players", len(all_players) - len(active_players))
+        st.metric("Joueurs inactifs", len(all_players) - len(active_players))
 
-    # Role requirements
+    # Besoins en rôles
     if active_players:
-        st.subheader("📋 Role Requirements")
+        st.subheader("📋 Besoins par rôle")
 
         requirements = calculate_role_requirements(config.mode, len(active_players))
 
         st.markdown(
             f"""
-        **Current setup**: {len(active_players)} players in **{config.mode.value}** mode
+        **Configuration actuelle** : {len(active_players)} joueurs en mode **{config.mode.value}**
 
-        **Needed counts**:
+        **Effectifs requis** :
         """
         )
 
@@ -67,25 +70,26 @@ def main() -> None:
         idx = 0
         if config.mode == TournamentMode.TRIPLETTE:
             roles_to_show = [
-                ("TIREUR", requirements.tireur_needed),
-                ("POINTEUR", requirements.pointeur_needed),
-                ("MILIEU", requirements.milieu_needed),
+                (PlayerRole.TIREUR, requirements.tireur_needed),
+                (PlayerRole.POINTEUR, requirements.pointeur_needed),
+                (PlayerRole.MILIEU, requirements.milieu_needed),
             ]
         else:
             roles_to_show = [
-                ("TIREUR", requirements.tireur_needed),
-                ("POINTEUR_MILIEU", requirements.pointeur_milieu_needed),
+                (PlayerRole.TIREUR, requirements.tireur_needed),
+                (PlayerRole.POINTEUR_MILIEU, requirements.pointeur_milieu_needed),
             ]
 
-        for role_name, needed in roles_to_show:
+        for role, needed in roles_to_show:
             with req_cols[idx]:
-                current = sum(1 for p in active_players if p.role.value == role_name)
+                current = sum(1 for p in active_players if p.role == role)
                 deficit = needed - current
                 st.metric(
-                    role_name,
+                    role.value,
                     f"{current} / {needed}",
+                    delta_arrow="down" if deficit > 0 else "off",
                     delta=f"{deficit:+d}" if deficit != 0 else "✓",
-                    delta_color="inverse" if deficit > 0 else "off",
+                    delta_color="inverse" if deficit > 0 else "normal",
                 )
             idx += 1
 
@@ -94,19 +98,20 @@ def main() -> None:
             for role, needed in roles_to_show
         ):
             st.warning(
-                "⚠️ Role counts don't match requirements. Some matches may use fallback formats."
+                "⚠️ Le nombre de joueurs par rôle ne correspond pas aux besoins. "
+                "Certaines parties pourront utiliser des formats alternatifs."
             )
 
     st.markdown("---")
 
-    # Add new player section
+    # Ajout d’un joueur
     if can_edit:
-        with st.expander("➕ Add New Player", expanded=False):
+        with st.expander("➕ Ajouter un joueur", expanded=False):
             with st.form("add_player_form"):
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    new_name = st.text_input("Player Name", max_chars=100)
+                    new_name = st.text_input("Nom du joueur", max_chars=100)
 
                 with col2:
                     if config.mode == TournamentMode.TRIPLETTE:
@@ -123,16 +128,16 @@ def main() -> None:
                         ]
 
                     new_role = st.selectbox(
-                        "Role",
+                        "Rôle",
                         options=role_options,
                         format_func=lambda x: x.value,
                     )
 
-                submitted = st.form_submit_button("Add Player", type="primary")
+                submitted = st.form_submit_button("Ajouter le joueur", type="primary")
 
                 if submitted:
                     if not new_name or not new_name.strip():
-                        st.error("❌ Player name cannot be empty")
+                        st.error("❌ Le nom du joueur ne peut pas être vide")
                     else:
                         try:
                             player = Player(
@@ -141,54 +146,52 @@ def main() -> None:
                                 active=True,
                             )
                             storage.add_player(player)
-                            st.success(f"✅ Added player: {new_name}")
+                            st.success(f"✅ Joueur ajouté : {new_name}")
                             st.rerun()
                         except ValueError as e:
-                            st.error(f"❌ Error: {e}")
+                            st.error(f"❌ Erreur : {e}")
 
-    # Player list
-    st.subheader("📋 Player Roster")
+    # Liste des joueurs
+    st.subheader("📋 Liste des joueurs")
 
-    # Filters
+    # Filtres
     filter_col1, filter_col2 = st.columns([2, 1])
 
     with filter_col1:
-        show_inactive = st.checkbox("Show inactive players", value=False)
+        show_inactive = st.checkbox("Afficher les joueurs inactifs", value=False)
 
     with filter_col2:
-        search_query = st.text_input("🔍 Search players", "")
+        search_query = st.text_input("🔍 Rechercher un joueur", "")
 
-    # Filter players
     display_players = active_players if not show_inactive else all_players
 
     if search_query:
         display_players = [p for p in display_players if search_query.lower() in p.name.lower()]
 
     if display_players:
-        # Create dataframe
         player_data: list[dict[str, str | int]] = []
         for player in display_players:
             player_data.append(
                 {
                     "ID": player.id or 0,
-                    "Name": player.name,
-                    "Role": player.role.value,
-                    "Status": "✓ Active" if player.active else "✗ Inactive",
+                    "Nom": player.name,
+                    "Rôle": player.role.value,
+                    "Statut": "✓ Actif" if player.active else "✗ Inactif",
                 }
             )
 
         df_players = pd.DataFrame(player_data)
         st.dataframe(df_players, width="stretch", hide_index=True)  # pyright: ignore[reportUnknownMemberType]
 
-        # Edit/Delete players
+        # Édition / suppression
         if can_edit:
-            st.subheader("✏️ Edit Player")
+            st.subheader("✏️ Modifier un joueur")
 
             selected_player_id = st.selectbox(
-                "Select player to edit",
+                "Sélectionner un joueur",
                 options=[p.id for p in display_players],
                 format_func=lambda pid: next(
-                    (p.name for p in display_players if p.id == pid), "Unknown"
+                    (p.name for p in display_players if p.id == pid), "Inconnu"
                 ),
             )
 
@@ -201,7 +204,9 @@ def main() -> None:
 
                         with col1:
                             edit_name = st.text_input(
-                                "Name", value=player_to_edit.name, max_chars=100
+                                "Nom",
+                                value=player_to_edit.name,
+                                max_chars=100,
                             )
 
                         with col2:
@@ -219,7 +224,7 @@ def main() -> None:
                                 ]
 
                             edit_role = st.selectbox(
-                                "Role",
+                                "Rôle",
                                 options=role_options,
                                 index=role_options.index(player_to_edit.role)
                                 if player_to_edit.role in role_options
@@ -228,23 +233,26 @@ def main() -> None:
                             )
 
                         with col3:
-                            edit_active = st.checkbox("Active", value=player_to_edit.active)
+                            edit_active = st.checkbox(
+                                "Actif",
+                                value=player_to_edit.active,
+                            )
 
                         col_submit, col_delete = st.columns(2)
 
                         with col_submit:
                             update_submitted = st.form_submit_button(
-                                "💾 Update Player", type="primary"
+                                "💾 Mettre à jour", type="primary"
                             )
 
                         with col_delete:
                             delete_submitted = st.form_submit_button(
-                                "🗑️ Delete Player", type="secondary"
+                                "🗑️ Supprimer", type="secondary"
                             )
 
                         if update_submitted:
                             if not edit_name or not edit_name.strip():
-                                st.error("❌ Player name cannot be empty")
+                                st.error("❌ Le nom du joueur ne peut pas être vide")
                             else:
                                 try:
                                     updated_player = Player(
@@ -255,51 +263,51 @@ def main() -> None:
                                         created_at=player_to_edit.created_at,
                                     )
                                     storage.update_player(updated_player)
-                                    st.success(f"✅ Updated player: {edit_name}")
+                                    st.success(f"✅ Joueur mis à jour : {edit_name}")
                                     st.rerun()
                                 except ValueError as e:
-                                    st.error(f"❌ Error: {e}")
+                                    st.error(f"❌ Erreur : {e}")
 
                         if delete_submitted:
                             try:
                                 storage.delete_player(player_to_edit.id or 0)
-                                st.success(f"✅ Deleted player: {player_to_edit.name}")
+                                st.success(f"✅ Joueur supprimé : {player_to_edit.name}")
                                 st.rerun()
                             except ValueError as e:
-                                st.error(f"❌ Error: {e}")
+                                st.error(f"❌ Erreur : {e}")
 
     else:
-        st.info("No players found. Add some players to get started!")
+        st.info("Aucun joueur trouvé. Ajoutez des joueurs pour commencer !")
 
-    # Bulk import (optional feature)
+    # Import en masse
     if can_edit:
-        with st.expander("📥 Bulk Import (CSV)", expanded=False):
+        with st.expander("📥 Import en masse (CSV)", expanded=False):
             st.markdown(
                 """
-            Upload a CSV file with columns: `name`, `role`
+            Téléversez un fichier CSV avec les colonnes : `name`, `role`
 
-            Example:
+            Exemple :
             ```
             name,role
-            John Doe,TIREUR
-            Jane Smith,POINTEUR
-            Bob Johnson,MILIEU
+            Jean Dupont,TIREUR
+            Marie Martin,POINTEUR
+            Paul Durand,MILIEU
             ```
             """
             )
 
-            uploaded_file = st.file_uploader("Choose CSV file", type=["csv"])
+            uploaded_file = st.file_uploader("Choisir un fichier CSV", type=["csv"])
 
             if uploaded_file is not None:
                 try:
                     df_import = pd.read_csv(uploaded_file)  # pyright: ignore[reportUnknownMemberType]
 
                     if "name" not in df_import.columns or "role" not in df_import.columns:
-                        st.error("❌ CSV must have 'name' and 'role' columns")
+                        st.error("❌ Le CSV doit contenir les colonnes 'name' et 'role'")
                     else:
                         st.dataframe(df_import)  # pyright: ignore[reportUnknownMemberType]
 
-                        if st.button("Import Players", type="primary"):
+                        if st.button("Importer les joueurs", type="primary"):
                             success_count = 0
                             error_count = 0
 
@@ -313,19 +321,21 @@ def main() -> None:
                                     storage.add_player(player)
                                     success_count += 1
                                 except Exception as e:
-                                    st.warning(f"⚠️ Skipped {row['name']}: {e}")
+                                    st.warning(f"⚠️ Joueur ignoré ({row['name']}) : {e}")
                                     error_count += 1
 
                             st.success(
-                                f"✅ Imported {success_count} players ({error_count} errors)"
+                                f"✅ {success_count} joueurs importés ({error_count} erreurs)"
                             )
                             st.rerun()
 
                 except Exception as e:
-                    st.error(f"❌ Error reading CSV: {e}")
+                    st.error(f"❌ Erreur lors de la lecture du CSV : {e}")
 
     st.markdown("---")
-    st.caption("💡 Tip: Ensure you have the right balance of roles before generating rounds.")
+    st.caption(
+        "💡 Astuce : assurez-vous d’avoir un bon équilibre des rôles avant de générer les manches."
+    )
 
 
 if __name__ == "__main__":
