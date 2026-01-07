@@ -59,7 +59,10 @@ def main() -> None:
 
         st.markdown(
             f"""
-        **Configuration actuelle** : {len(active_players)} joueurs en mode **{config.mode.value}**
+        **Configuration actuelle** :
+        {len(active_players)} joueurs au total
+        - {requirements.triplette_count} donc {requirements.triplette_count * 3} joueurs en équipes de triplette
+        - {requirements.doublette_count} donc {requirements.doublette_count * 2} joueurs en équipes de doublette
 
         **Effectifs requis** :
         """
@@ -68,17 +71,12 @@ def main() -> None:
         req_cols = st.columns(4)
 
         idx = 0
-        if config.mode == TournamentMode.TRIPLETTE:
-            roles_to_show = [
-                (PlayerRole.TIREUR, requirements.tireur_needed),
-                (PlayerRole.POINTEUR, requirements.pointeur_needed),
-                (PlayerRole.MILIEU, requirements.milieu_needed),
-            ]
-        else:
-            roles_to_show = [
-                (PlayerRole.TIREUR, requirements.tireur_needed),
-                (PlayerRole.POINTEUR_MILIEU, requirements.pointeur_milieu_needed),
-            ]
+        roles_to_show = [
+            (PlayerRole.TIREUR, requirements.tireur_needed),
+            (PlayerRole.POINTEUR, requirements.pointeur_needed),
+            (PlayerRole.MILIEU, requirements.milieu_needed),
+            (PlayerRole.POINTEUR_MILIEU, requirements.pointeur_milieu_needed),
+        ]
 
         for role, needed in roles_to_show:
             with req_cols[idx]:
@@ -86,7 +84,7 @@ def main() -> None:
                 deficit = needed - current
                 st.metric(
                     role.value,
-                    f"{current} / {needed}",
+                    f"{current} présents / {needed} requis",
                     delta_arrow="down" if deficit > 0 else "off",
                     delta=f"{deficit:+d}" if deficit != 0 else "✓",
                     delta_color="inverse" if deficit > 0 else "normal",

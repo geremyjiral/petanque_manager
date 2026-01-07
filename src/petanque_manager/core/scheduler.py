@@ -187,6 +187,8 @@ def calculate_role_requirements(mode: TournamentMode, player_count: int) -> Role
             pointeur_needed=pointeur_needed,
             milieu_needed=milieu_needed,
             pointeur_milieu_needed=pointeur_milieu_needed,
+            triplette_count=triplette_teams,
+            doublette_count=doublette_teams,
         )
     else:  # DOUBLETTE
         # Prefer doublette: need 1 TIREUR, 1 POINTEUR_MILIEU per team
@@ -220,6 +222,8 @@ def calculate_role_requirements(mode: TournamentMode, player_count: int) -> Role
             pointeur_needed=0,
             milieu_needed=0,
             pointeur_milieu_needed=pointeur_milieu_needed,
+            triplette_count=triplette_teams,
+            doublette_count=doublette_teams,
         )
 
 

@@ -233,6 +233,8 @@ class RoleRequirements(BaseModel):
     pointeur_needed: int
     milieu_needed: int
     pointeur_milieu_needed: int
+    triplette_count: int
+    doublette_count: int
 
     @property
     def total_needed(self) -> int:
