@@ -1,5 +1,5 @@
 [project]
-name = "petanque-papa"
+name = "petanque_manager"
 version = "0.1.0"
 description = "Production-quality pétanque tournament management application with Streamlit"
 readme = "README.md"
