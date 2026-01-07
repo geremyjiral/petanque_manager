@@ -164,7 +164,14 @@ def show_login_form() -> None:
     with st.sidebar:
         if not is_authenticated():
             try:
-                authenticator.login(fields={"Form name": "Connexion", "Username": "Nom d'utilisateur", "Password": "Mot de passe", "Login": "Se connecter"})  # pyright: ignore[reportUnknownMemberType]
+                authenticator.login(  # pyright: ignore[reportUnknownMemberType]
+                    fields={
+                        "Form name": "Connexion",
+                        "Username": "Nom d'utilisateur",
+                        "Password": "Mot de passe",
+                        "Login": "Se connecter",
+                    }
+                )
             except Exception:
                 pass
 

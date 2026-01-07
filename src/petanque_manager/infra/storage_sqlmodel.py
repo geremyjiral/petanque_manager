@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 
+import streamlit as st
 from sqlmodel import Field, Session, SQLModel, col, create_engine, select
 
 from src.petanque_manager.core.models import (
@@ -85,7 +86,10 @@ class SQLModelStorage(TournamentStorage):
             db_path: Path to SQLite database file
         """
         self.db_path = db_path
-        self.engine = create_engine(f"sqlite:///{db_path}")
+        if "db" in st.secrets:
+            self.engine = create_engine(st.secrets["db"]["database_url"])
+        else:
+            self.engine = create_engine(f"sqlite:///{db_path}")
 
     def initialize(self) -> None:
         """Initialize database tables."""

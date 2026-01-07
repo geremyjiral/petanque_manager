@@ -31,7 +31,7 @@ format-check: ## Check code formatting
 	uv run ruff format --check .
 
 typecheck: ## Run type checking
-	uv run mypy src/ app.py pages/ --ignore-missing-imports
+	uv run mypy src/ Acceuil.py pages/ --ignore-missing-imports
 
 check: lint format-check typecheck test ## Run all checks (lint, format, typecheck, test)
 
