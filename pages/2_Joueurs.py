@@ -4,9 +4,9 @@ import pandas as pd
 import streamlit as st
 
 from Acceuil import get_storage
-from src.core.models import Player, PlayerRole, TournamentMode
-from src.core.scheduler import calculate_role_requirements
-from src.infra.auth import is_authenticated, show_login_form
+from src.petanque_manager.core.models import Player, PlayerRole, TournamentMode
+from src.petanque_manager.core.scheduler import calculate_role_requirements
+from src.petanque_manager.infra.auth import is_authenticated, show_login_form
 
 
 def main() -> None:

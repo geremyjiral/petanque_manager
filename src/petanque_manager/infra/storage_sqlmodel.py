@@ -5,7 +5,7 @@ from datetime import datetime
 
 from sqlmodel import Field, Session, SQLModel, col, create_engine, select
 
-from src.core.models import (
+from src.petanque_manager.core.models import (
     Match,
     MatchFormat,
     Player,
@@ -15,7 +15,7 @@ from src.core.models import (
     TournamentConfig,
     TournamentMode,
 )
-from src.infra.storage import TournamentStorage
+from src.petanque_manager.infra.storage import TournamentStorage
 
 SQLModel.__table_args__ = {"extend_existing": True}
 

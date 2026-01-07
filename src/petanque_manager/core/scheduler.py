@@ -11,7 +11,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass
 
-from src.core.models import (
+from src.petanque_manager.core.models import (
     Match,
     MatchFormat,
     Player,
@@ -21,8 +21,8 @@ from src.core.models import (
     ScheduleQualityReport,
     TournamentMode,
 )
-from src.utils.seed import set_random_seed
-from src.utils.terrain_labels import get_terrain_label
+from src.petanque_manager.utils.seed import set_random_seed
+from src.petanque_manager.utils.terrain_labels import get_terrain_label
 
 
 @dataclass

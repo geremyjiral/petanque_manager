@@ -6,8 +6,8 @@ import pandas as pd
 import streamlit as st
 
 from Acceuil import get_storage
-from src.core.stats import get_tournament_summary
-from src.infra.auth import show_login_form
+from src.petanque_manager.core.stats import get_tournament_summary
+from src.petanque_manager.infra.auth import show_login_form
 
 
 def main() -> None:

@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.models import (
+from src.petanque_manager.core.models import (
     Match,
     MatchFormat,
     Player,
@@ -10,7 +10,7 @@ from src.core.models import (
     Round,
     TournamentMode,
 )
-from src.core.scheduler import (
+from src.petanque_manager.core.scheduler import (
     ConstraintTracker,
     TournamentScheduler,
     calculate_role_requirements,

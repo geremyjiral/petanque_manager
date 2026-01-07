@@ -171,7 +171,7 @@ print(hashed)
 Or use the utility:
 
 ```python
-from src.infra.auth import hash_password
+from src.petanque_manager.infra.auth import hash_password
 
 print(hash_password("your_secure_password"))
 ```

@@ -6,7 +6,7 @@ Follows the Repository pattern for clean architecture.
 
 from abc import ABC, abstractmethod
 
-from src.core.models import Match, Player, Round, TournamentConfig
+from src.petanque_manager.core.models import Match, Player, Round, TournamentConfig
 
 
 class TournamentStorage(ABC):

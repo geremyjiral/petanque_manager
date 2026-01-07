@@ -43,7 +43,7 @@ Generate password hash:
 uv run python scripts/hash_password.py
 
 # Or manually in Python
-python -c "from src.infra.auth import hash_password; print(hash_password('your_password'))"
+python -c "from src.petanque_manager.infra.auth import hash_password; print(hash_password('your_password'))"
 ```
 
 ## 📋 5-Minute Setup

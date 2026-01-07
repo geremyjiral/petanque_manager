@@ -1,7 +1,7 @@
 """Tests for ranking and statistics calculation."""
 
-from src.core.models import Match, MatchFormat, Player, PlayerRole
-from src.core.stats import (
+from src.petanque_manager.core.models import Match, MatchFormat, Player, PlayerRole
+from src.petanque_manager.core.stats import (
     calculate_player_stats,
     get_head_to_head_stats,
     get_partnership_stats,

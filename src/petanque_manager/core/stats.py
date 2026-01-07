@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 
-from src.core.models import Match, Player, PlayerStats
+from src.petanque_manager.core.models import Match, Player, PlayerStats
 
 
 def calculate_player_stats(

@@ -1,7 +1,7 @@
 """Tests for constraint tracking and violation scoring."""
 
-from src.core.models import Match, MatchFormat, TournamentMode
-from src.core.scheduler import ConstraintTracker
+from src.petanque_manager.core.models import Match, MatchFormat, TournamentMode
+from src.petanque_manager.core.scheduler import ConstraintTracker
 
 
 def test_constraint_tracker_initialization() -> None:

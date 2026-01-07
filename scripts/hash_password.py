@@ -10,7 +10,7 @@ If no password is provided, will prompt for one.
 import sys
 from getpass import getpass
 
-from src.infra.auth import hash_password
+from src.petanque_manager.infra.auth import hash_password
 
 
 def main() -> None:

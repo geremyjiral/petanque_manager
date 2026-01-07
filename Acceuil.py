@@ -6,11 +6,16 @@ Lancer avec : streamlit run app.py
 
 import streamlit as st
 
-from src.core.models import PlayerRole, StorageBackend, TournamentConfig, TournamentMode
-from src.infra.auth import is_authenticated, show_login_form
-from src.infra.storage import TournamentStorage
-from src.infra.storage_json import JSONStorage
-from src.infra.storage_sqlmodel import SQLModelStorage
+from src.petanque_manager.core.models import (
+    PlayerRole,
+    StorageBackend,
+    TournamentConfig,
+    TournamentMode,
+)
+from src.petanque_manager.infra.auth import is_authenticated, show_login_form
+from src.petanque_manager.infra.storage import TournamentStorage
+from src.petanque_manager.infra.storage_json import JSONStorage
+from src.petanque_manager.infra.storage_sqlmodel import SQLModelStorage
 
 # Configuration de la page
 st.set_page_config(
@@ -229,7 +234,7 @@ def main() -> None:
 
     # Besoins en rôles
     if players:
-        from src.core.scheduler import calculate_role_requirements
+        from src.petanque_manager.core.scheduler import calculate_role_requirements
 
         st.subheader("📋 Besoins par rôle")
 

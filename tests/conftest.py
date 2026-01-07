@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.models import Player, PlayerRole
+from src.petanque_manager.core.models import Player, PlayerRole
 
 
 @pytest.fixture

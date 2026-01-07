@@ -6,9 +6,9 @@ import pandas as pd
 import streamlit as st
 
 from Acceuil import get_storage
-from src.core.models import PlayerRole
-from src.core.stats import calculate_player_stats
-from src.infra.auth import show_login_form
+from src.petanque_manager.core.models import PlayerRole
+from src.petanque_manager.core.stats import calculate_player_stats
+from src.petanque_manager.infra.auth import show_login_form
 
 
 def main() -> None:
