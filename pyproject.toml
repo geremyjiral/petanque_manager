@@ -1,0 +1,100 @@
+[project]
+name = "petanque-papa"
+version = "0.1.0"
+description = "Production-quality pétanque tournament management application with Streamlit"
+readme = "README.md"
+authors = [
+    {name = "Jeremy", email = "jeremy@example.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.13"
+dependencies = [
+    "streamlit>=1.32.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "sqlmodel>=0.0.16",
+    "streamlit-authenticator>=0.3.1",
+    "pyyaml>=6.0",
+    "pandas>=2.0.0",
+    "bcrypt>=4.1.0",
+]
+keywords = ["petanque", "tournament", "streamlit", "sports"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by formatter
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+follow_imports = "silent"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "streamlit.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "streamlit_authenticator.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--strict-markers --cov=src --cov-report=term-missing"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "mypy>=1.8.0",
+    "ruff>=0.3.0",
+    "pandas-stubs>=2.0.0",
+    "types-pyyaml>=6.0.0",
+]
+
+[tool.uv.sources]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
