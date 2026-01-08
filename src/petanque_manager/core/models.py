@@ -18,22 +18,19 @@ class TournamentMode(str, Enum):
 
 
 class MatchFormat(str, Enum):
-    """Match format: triplette (3v3) or doublette (2v2)."""
+    """Match format: triplette (3v3), doublette (2v2), or hybrid (3v2)."""
 
     TRIPLETTE = "Triplette"
     DOUBLETTE = "Doublette"
+    HYBRID = "Hybride (3v2)"
 
 
 class PlayerRole(str, Enum):
     """Player roles in pétanque."""
 
-    # Used in TRIPLETTE mode
     TIREUR = "Tireur"  # Shooter
     POINTEUR = "Pointeur"  # Pointer
     MILIEU = "Milieu"  # Middle player
-
-    # Used in DOUBLETTE mode (can also be used as fallback)
-    POINTEUR_MILIEU = "Pointeur/Milieu"  # Combined pointer/middle role
 
 
 class StorageBackend(str, Enum):
@@ -48,7 +45,7 @@ class Player(BaseModel):
 
     id: int | None = None
     name: str = Field(..., min_length=1, max_length=100)
-    role: PlayerRole
+    roles: list[PlayerRole] = Field(..., min_length=1)
     active: bool = True
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -58,9 +55,25 @@ class Player(BaseModel):
         """Validate and normalize player name."""
         return v.strip()
 
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, v: list[PlayerRole]) -> list[PlayerRole]:
+        """Validate roles list."""
+        if not v:
+            raise ValueError("Player must have at least one role")
+        # Remove duplicates while preserving order
+        seen: set[PlayerRole] = set()
+        unique_roles: list[PlayerRole] = []
+        for role in v:
+            if role not in seen:
+                seen.add(role)
+                unique_roles.append(role)
+        return unique_roles
+
     def __str__(self) -> str:
         """Return string representation."""
-        return f"{self.name} ({self.role.value})"
+        roles_str = ", ".join(role.value for role in self.roles)
+        return f"{self.name} ({roles_str})"
 
 
 class Team(BaseModel):
@@ -107,17 +120,27 @@ class Match(BaseModel):
     def model_post_init(self, __context: object) -> None:
         """Validate after model creation."""
         # Check format matches team sizes
-        expected_size = 3 if self.format == MatchFormat.TRIPLETTE else 2
-        if len(self.team_a_player_ids) != expected_size:
-            raise ValueError(
-                f"Team A size {len(self.team_a_player_ids)} doesn't match format "
-                f"{self.format.value} (expected {expected_size})"
-            )
-        if len(self.team_b_player_ids) != expected_size:
-            raise ValueError(
-                f"Team B size {len(self.team_b_player_ids)} doesn't match format "
-                f"{self.format.value} (expected {expected_size})"
-            )
+        size_a = len(self.team_a_player_ids)
+        size_b = len(self.team_b_player_ids)
+
+        if self.format == MatchFormat.TRIPLETTE:
+            # Both teams must be 3 players
+            if size_a != 3 or size_b != 3:
+                raise ValueError(
+                    f"Triplette format requires 3v3, got {size_a}v{size_b}"
+                )
+        elif self.format == MatchFormat.DOUBLETTE:
+            # Both teams must be 2 players
+            if size_a != 2 or size_b != 2:
+                raise ValueError(
+                    f"Doublette format requires 2v2, got {size_a}v{size_b}"
+                )
+        elif self.format == MatchFormat.HYBRID:
+            # One team 3, one team 2 (order doesn't matter)
+            if not ((size_a == 3 and size_b == 2) or (size_a == 2 and size_b == 3)):
+                raise ValueError(
+                    f"Hybrid format requires 3v2 or 2v3, got {size_a}v{size_b}"
+                )
 
         # Check no player plays against themselves
         all_players = set(self.team_a_player_ids + self.team_b_player_ids)
@@ -178,7 +201,7 @@ class PlayerStats(BaseModel):
 
     player_id: int
     player_name: str
-    role: PlayerRole
+    roles: list[PlayerRole]
     matches_played: int = 0
     wins: int = 0
     losses: int = 0
@@ -225,21 +248,22 @@ class ScheduleQualityReport(BaseModel):
 
 
 class RoleRequirements(BaseModel):
-    """Required player counts by role for a given mode and player count."""
+    """Required player counts by role for a given mode and player count.
+
+    Note: With multiple roles per player, these represent the number of players
+    who SHOULD be able to play each role (i.e., have it in their roles list).
+    """
 
     mode: TournamentMode
     total_players: int
-    tireur_needed: int
-    pointeur_needed: int
-    milieu_needed: int
-    pointeur_milieu_needed: int
-    triplette_count: int
-    doublette_count: int
+    tireur_needed: int  # Players who can play TIREUR
+    pointeur_needed: int  # Players who can play POINTEUR
+    milieu_needed: int  # Players who can play MILIEU
+    triplette_count: int  # Number of triplette teams
+    doublette_count: int  # Number of doublette teams
+    hybrid_count: int = 0  # Number of hybrid matches (3v2)
 
     @property
     def total_needed(self) -> int:
-        """Get total needed players."""
-        if self.mode == TournamentMode.TRIPLETTE:
-            return self.tireur_needed + self.pointeur_needed + self.milieu_needed
-        else:
-            return self.tireur_needed + self.pointeur_milieu_needed
+        """Get total needed players (sum of all team members)."""
+        return self.triplette_count * 3 + self.doublette_count * 2

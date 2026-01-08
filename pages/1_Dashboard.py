@@ -164,16 +164,22 @@ def main() -> None:
 
         from collections import Counter
 
-        role_counts = Counter(p.role.value for p in players)
+        # Count all roles (each player can have multiple roles)
+        all_roles: list[str] = []
+        for player in players:
+            all_roles.extend([role.value for role in player.roles])
+
+        role_counts = Counter(all_roles)
 
         role_data: list[dict[str, Any]] = [
-            {"Rôle": role, "Nombre": count} for role, count in role_counts.items()
+            {"Rôle": role, "Nombre de joueurs": count} for role, count in role_counts.items()
         ]
         df_roles = pd.DataFrame(role_data)
 
         col1, col2 = st.columns([1, 2])
 
         with col1:
+            st.caption("Note : Un joueur peut avoir plusieurs rôles")
             st.dataframe(df_roles, width="stretch", hide_index=True)  # pyright: ignore[reportUnknownMemberType]
 
         with col2:

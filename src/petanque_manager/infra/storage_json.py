@@ -91,7 +91,7 @@ class JSONStorage(TournamentStorage):
         player_data: dict[str, Any] = {
             "id": player_id,
             "name": player.name,
-            "role": player.role.value,
+            "roles": [role.value for role in player.roles],
             "active": player.active,
             "created_at": player.created_at.isoformat(),
         }
@@ -101,7 +101,7 @@ class JSONStorage(TournamentStorage):
         return Player(
             id=player_id,
             name=player.name,
-            role=player.role,
+            roles=player.roles,
             active=player.active,
             created_at=player.created_at,
         )
@@ -110,10 +110,17 @@ class JSONStorage(TournamentStorage):
         """Get a player by ID."""
         for p in self.data["players"]:
             if p["id"] == player_id and not p.get("deleted", False):
+                # Handle both old format (single role) and new format (multiple roles)
+                if "roles" in p:
+                    roles = [PlayerRole(role) for role in p["roles"]]
+                else:
+                    # Backwards compatibility: convert old single role to list
+                    roles = [PlayerRole(p["role"])]
+
                 return Player(
                     id=p["id"],
                     name=p["name"],
-                    role=PlayerRole(p["role"]),
+                    roles=roles,
                     active=p["active"],
                     created_at=p["created_at"],
                 )
@@ -128,11 +135,18 @@ class JSONStorage(TournamentStorage):
             if active_only and not p["active"]:
                 continue
 
+            # Handle both old format (single role) and new format (multiple roles)
+            if "roles" in p:
+                roles = [PlayerRole(role) for role in p["roles"]]
+            else:
+                # Backwards compatibility: convert old single role to list
+                roles = [PlayerRole(p["role"])]
+
             players.append(
                 Player(
                     id=p["id"],
                     name=p["name"],
-                    role=PlayerRole(p["role"]),
+                    roles=roles,
                     active=p["active"],
                     created_at=p["created_at"],
                 )
@@ -147,14 +161,16 @@ class JSONStorage(TournamentStorage):
         for p in self.data["players"]:
             if p["id"] == player.id and not p.get("deleted", False):
                 p["name"] = player.name
-                p["role"] = player.role.value
+                p["roles"] = [role.value for role in player.roles]
+                # Remove old single role field if it exists
+                p.pop("role", None)
                 p["active"] = player.active
                 self._save()
 
                 return Player(
                     id=p["id"],
                     name=p["name"],
-                    role=PlayerRole(p["role"]),
+                    roles=player.roles,
                     active=p["active"],
                     created_at=p["created_at"],
                 )

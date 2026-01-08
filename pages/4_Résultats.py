@@ -83,10 +83,10 @@ def main() -> None:
                             team_b_players.append(player)
 
                     team_a_display = " + ".join(
-                        [f"{p.name} ({p.role.value})" for p in team_a_players]
+                        [f"{p.name} ({', '.join(r.value for r in p.roles)})" for p in team_a_players]
                     )
                     team_b_display = " + ".join(
-                        [f"{p.name} ({p.role.value})" for p in team_b_players]
+                        [f"{p.name} ({', '.join(r.value for r in p.roles)})" for p in team_b_players]
                     )
 
                     # En-tête du match

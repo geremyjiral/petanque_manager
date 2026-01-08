@@ -29,7 +29,7 @@ class PlayerDB(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
-    role: str  # Store as string
+    roles: str  # Store as JSON string
     active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.now)
 
@@ -144,7 +144,7 @@ class SQLModelStorage(TournamentStorage):
 
             player_db = PlayerDB(
                 name=player.name,
-                role=player.role.value,
+                roles=json.dumps([role.value for role in player.roles]),
                 active=player.active,
                 created_at=player.created_at,
             )
@@ -156,7 +156,7 @@ class SQLModelStorage(TournamentStorage):
             return Player(
                 id=player_db.id,
                 name=player_db.name,
-                role=PlayerRole(player_db.role),
+                roles=[PlayerRole(role) for role in player_db.roles],
                 active=player_db.active,
                 created_at=player_db.created_at,
             )
@@ -171,7 +171,7 @@ class SQLModelStorage(TournamentStorage):
             return Player(
                 id=player_db.id,
                 name=player_db.name,
-                role=PlayerRole(player_db.role),
+                roles=[PlayerRole(role) for role in player_db.roles],
                 active=player_db.active,
                 created_at=player_db.created_at,
             )
@@ -189,7 +189,7 @@ class SQLModelStorage(TournamentStorage):
                 Player(
                     id=p.id,
                     name=p.name,
-                    role=PlayerRole(p.role),
+                    roles=[PlayerRole(role) for role in p.roles],
                     active=p.active,
                     created_at=p.created_at,
                 )
@@ -207,7 +207,7 @@ class SQLModelStorage(TournamentStorage):
                 raise ValueError(f"Player with ID {player.id} not found")
 
             player_db.name = player.name
-            player_db.role = player.role.value
+            player_db.roles = json.dumps([role.value for role in player.roles])
             player_db.active = player.active
 
             session.add(player_db)
@@ -217,7 +217,7 @@ class SQLModelStorage(TournamentStorage):
             return Player(
                 id=player_db.id,
                 name=player_db.name,
-                role=PlayerRole(player_db.role),
+                roles=[PlayerRole(role) for role in player_db.roles],
                 active=player_db.active,
                 created_at=player_db.created_at,
             )

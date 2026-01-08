@@ -13,10 +13,10 @@ from src.petanque_manager.core.stats import (
 def test_calculate_player_stats_basic() -> None:
     """Test basic player statistics calculation."""
     players = [
-        Player(id=1, name="P1", role=PlayerRole.TIREUR),
-        Player(id=2, name="P2", role=PlayerRole.POINTEUR),
-        Player(id=3, name="P3", role=PlayerRole.MILIEU),
-        Player(id=4, name="P4", role=PlayerRole.TIREUR),
+        Player(id=1, name="P1", roles=[PlayerRole.TIREUR]),
+        Player(id=2, name="P2", roles=[PlayerRole.POINTEUR]),
+        Player(id=3, name="P3", roles=[PlayerRole.MILIEU]),
+        Player(id=4, name="P4", roles=[PlayerRole.TIREUR]),
     ]
 
     matches = [
@@ -63,10 +63,10 @@ def test_calculate_player_stats_basic() -> None:
 def test_calculate_player_stats_multiple_matches() -> None:
     """Test statistics with multiple matches."""
     players = [
-        Player(id=1, name="P1", role=PlayerRole.TIREUR),
-        Player(id=2, name="P2", role=PlayerRole.POINTEUR),
-        Player(id=3, name="P3", role=PlayerRole.MILIEU),
-        Player(id=4, name="P4", role=PlayerRole.TIREUR),
+        Player(id=1, name="P1", roles=[PlayerRole.TIREUR]),
+        Player(id=2, name="P2", roles=[PlayerRole.POINTEUR]),
+        Player(id=3, name="P3", roles=[PlayerRole.MILIEU]),
+        Player(id=4, name="P4", roles=[PlayerRole.TIREUR]),
     ]
 
     matches = [
@@ -108,9 +108,12 @@ def test_calculate_player_stats_multiple_matches() -> None:
 def test_ranking_order() -> None:
     """Test that players are ranked correctly."""
     _players = [
-        Player(id=1, name="P1", role=PlayerRole.TIREUR),
-        Player(id=2, name="P2", role=PlayerRole.POINTEUR),
-        Player(id=3, name="P3", role=PlayerRole.MILIEU),
+        Player(id=1, name="P1", roles=[PlayerRole.TIREUR]),
+        Player(id=2, name="P2", roles=[PlayerRole.POINTEUR]),
+        Player(id=3, name="P3", roles=[PlayerRole.MILIEU]),
+        Player(id=4, name="P4", roles=[PlayerRole.TIREUR]),
+        Player(id=5, name="P5", roles=[PlayerRole.POINTEUR]),
+        Player(id=6, name="P6", roles=[PlayerRole.MILIEU]),
     ]
 
     _matches = [
@@ -121,7 +124,7 @@ def test_ranking_order() -> None:
             terrain_label="A",
             format=MatchFormat.DOUBLETTE,
             team_a_player_ids=[1, 2],
-            team_b_player_ids=[3],  # Invalid but for testing
+            team_b_player_ids=[3, 4],  # Invalid but for testing
             score_a=13,
             score_b=5,
         ),
@@ -131,8 +134,8 @@ def test_ranking_order() -> None:
             round_index=1,
             terrain_label="B",
             format=MatchFormat.DOUBLETTE,
-            team_a_player_ids=[2],
-            team_b_player_ids=[3],
+            team_a_player_ids=[2, 5],
+            team_b_player_ids=[3, 6],
             score_a=13,
             score_b=5,
         ),
@@ -238,9 +241,12 @@ def test_get_partnership_stats() -> None:
 def test_get_tournament_summary() -> None:
     """Test tournament summary statistics."""
     players = [
-        Player(id=1, name="P1", role=PlayerRole.TIREUR, active=True),
-        Player(id=2, name="P2", role=PlayerRole.POINTEUR, active=True),
-        Player(id=3, name="P3", role=PlayerRole.MILIEU, active=False),
+        Player(id=1, name="P1", roles=[PlayerRole.TIREUR], active=True),
+        Player(id=2, name="P2", roles=[PlayerRole.POINTEUR], active=True),
+        Player(id=3, name="P3", roles=[PlayerRole.MILIEU], active=False),
+        Player(id=4, name="P4", roles=[PlayerRole.TIREUR], active=True),
+        Player(id=5, name="P5", roles=[PlayerRole.POINTEUR], active=True),
+        Player(id=6, name="P6", roles=[PlayerRole.MILIEU], active=True),
     ]
 
     matches = [
@@ -250,7 +256,7 @@ def test_get_tournament_summary() -> None:
             terrain_label="A",
             format=MatchFormat.DOUBLETTE,
             team_a_player_ids=[1, 2],
-            team_b_player_ids=[3],
+            team_b_player_ids=[3, 4],
             score_a=13,
             score_b=5,
         ),
@@ -260,15 +266,15 @@ def test_get_tournament_summary() -> None:
             terrain_label="B",
             format=MatchFormat.TRIPLETTE,
             team_a_player_ids=[1, 2, 3],
-            team_b_player_ids=[],
+            team_b_player_ids=[4, 5, 6],
             # No score (pending)
         ),
     ]
 
     summary = get_tournament_summary(players, matches)
 
-    assert summary["total_players"] == 3
-    assert summary["active_players"] == 2
+    assert summary["total_players"] == 6
+    assert summary["active_players"] == 5
     assert summary["total_matches"] == 2
     assert summary["completed_matches"] == 1
     assert summary["pending_matches"] == 1
@@ -278,7 +284,7 @@ def test_get_tournament_summary() -> None:
 
 def test_win_rate_calculation() -> None:
     """Test win rate calculation."""
-    players = [Player(id=1, name="P1", role=PlayerRole.TIREUR)]
+    players = [Player(id=1, name="P1", roles=[PlayerRole.TIREUR])]
 
     matches = [
         # Win
@@ -313,7 +319,7 @@ def test_win_rate_calculation() -> None:
 
 def test_stats_with_no_matches() -> None:
     """Test statistics calculation with no matches."""
-    players = [Player(id=1, name="P1", role=PlayerRole.TIREUR)]
+    players = [Player(id=1, name="P1", roles=[PlayerRole.TIREUR])]
 
     stats = calculate_player_stats(players, [])
 
@@ -325,7 +331,7 @@ def test_stats_with_no_matches() -> None:
 
 def test_stats_ignore_incomplete_matches() -> None:
     """Test that incomplete matches are ignored in statistics."""
-    players = [Player(id=1, name="P1", role=PlayerRole.TIREUR)]
+    players = [Player(id=1, name="P1", roles=[PlayerRole.TIREUR])]
 
     matches = [
         # Incomplete match (no scores)

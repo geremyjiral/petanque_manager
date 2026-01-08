@@ -235,57 +235,43 @@ def main() -> None:
         """
         )
 
-        req_col1, req_col2, req_col3, req_col4 = st.columns(4)
+        mode_col1, mode_col2, mode_col3 = st.columns(3)
+        with mode_col1:
+            st.metric("Triplette (3v3)", requirements.triplette_count)
+        with mode_col2:
+            st.metric("Doublette (2v2)", requirements.doublette_count)
+        with mode_col3:
+            st.metric("Hybride (3v2)", requirements.hybrid_count)
+
+        req_col1, req_col2, req_col3 = st.columns(3)
 
         with req_col1:
-            if config.mode == TournamentMode.TRIPLETTE:
-                tireur_count = sum(1 for p in players if p.role == PlayerRole.TIREUR)
-                delta = tireur_count - requirements.tireur_needed
-                st.metric(
-                    PlayerRole.TIREUR.value,
-                    f"{tireur_count} / {requirements.tireur_needed}",
-                    delta=f"{delta:+d}" if delta != 0 else "OK",
-                    delta_color="off" if delta == 0 else "normal",
-                )
+            tireur_count = sum(1 for p in players if PlayerRole.TIREUR in p.roles)
+            delta = tireur_count - requirements.tireur_needed
+            st.metric(
+                PlayerRole.TIREUR.value,
+                f"{tireur_count} / {requirements.tireur_needed}",
+                delta=f"{delta:+d}" if delta != 0 else "OK",
+                delta_color="off" if delta == 0 else "normal",
+            )
 
         with req_col2:
-            if config.mode == TournamentMode.TRIPLETTE:
-                pointeur_count = sum(1 for p in players if p.role == PlayerRole.POINTEUR)
-                delta = pointeur_count - requirements.pointeur_needed
-                st.metric(
-                    PlayerRole.POINTEUR.value,
-                    f"{pointeur_count} / {requirements.pointeur_needed}",
-                    delta=f"{delta:+d}" if delta != 0 else "OK",
-                    delta_color="off" if delta == 0 else "normal",
-                )
+            pointeur_count = sum(1 for p in players if PlayerRole.POINTEUR in p.roles)
+            delta = pointeur_count - requirements.pointeur_needed
+            st.metric(
+                PlayerRole.POINTEUR.value,
+                f"{pointeur_count} / {requirements.pointeur_needed}",
+                delta=f"{delta:+d}" if delta != 0 else "OK",
+                delta_color="off" if delta == 0 else "normal",
+            )
 
         with req_col3:
             if config.mode == TournamentMode.TRIPLETTE:
-                milieu_count = sum(1 for p in players if p.role == PlayerRole.MILIEU)
+                milieu_count = sum(1 for p in players if PlayerRole.MILIEU in p.roles)
                 delta = milieu_count - requirements.milieu_needed
                 st.metric(
                     PlayerRole.MILIEU.value,
                     f"{milieu_count} / {requirements.milieu_needed}",
-                    delta=f"{delta:+d}" if delta != 0 else "OK",
-                    delta_color="off" if delta == 0 else "normal",
-                )
-            else:
-                pointeur_milieu_count = sum(1 for p in players if p.role == PlayerRole.POINTEUR)
-                delta = pointeur_milieu_count - requirements.pointeur_milieu_needed
-                st.metric(
-                    PlayerRole.POINTEUR.value,
-                    f"{pointeur_milieu_count} / {requirements.pointeur_milieu_needed}",
-                    delta=f"{delta:+d}" if delta != 0 else "OK",
-                    delta_color="off" if delta == 0 else "normal",
-                )
-
-        with req_col4:
-            if config.mode == TournamentMode.DOUBLETTE:
-                tireur_count = sum(1 for p in players if p.role == PlayerRole.TIREUR)
-                delta = tireur_count - requirements.tireur_needed
-                st.metric(
-                    PlayerRole.TIREUR.value,
-                    f"{tireur_count} / {requirements.tireur_needed}",
                     delta=f"{delta:+d}" if delta != 0 else "OK",
                     delta_color="off" if delta == 0 else "normal",
                 )

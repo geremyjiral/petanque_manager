@@ -127,10 +127,10 @@ class ConstraintTracker:
                 if pid_b in self.opponents[pid_a]:
                     score += 5.0
 
-        # Check repeated terrains (medium penalty: 3 points per violation)
+        # Check repeated terrains (medium penalty: 2 points per violation)
         for pid in team_a + team_b:
             if terrain in self.terrains[pid]:
-                score += 3.0
+                score += 2.0
 
         # Check fallback format (medium penalty: 4 points per player)
         is_fallback = (
@@ -143,8 +143,69 @@ class ConstraintTracker:
         return score
 
 
+def _find_optimal_match_distribution(
+    player_count: int, mode: TournamentMode
+) -> tuple[int, int, int]:
+    """Find the optimal distribution of matches to include ALL players.
+
+    Strategy:
+    - Triplette match (3v3): 6 players
+    - Doublette match (2v2): 4 players
+    - Hybrid match (3v2): 5 players (used when necessary to avoid benching)
+
+    Returns:
+        (nb_triplette_matches, nb_doublette_matches, nb_hybrid_matches)
+    """
+    if player_count < 4:
+        # Not enough players for any match
+        return (0, 0, 0)
+
+    best_solution: tuple[int, int, int] = (0, 0, 0)
+    best_bench = player_count  # Worst case: everyone benched
+
+    # Try all possible combinations
+    max_3v3 = player_count // 6
+    max_2v2 = player_count // 4
+    max_3v2 = player_count // 5
+
+    for nb_3v3 in range(max_3v3 + 1):
+        for nb_2v2 in range(max_2v2 + 1):
+            for nb_3v2 in range(max_3v2 + 1):
+                players_used = nb_3v3 * 6 + nb_2v2 * 4 + nb_3v2 * 5
+                bench = player_count - players_used
+
+                if bench < 0:
+                    continue
+
+                # Prioritize solutions with fewer benched players
+                if bench < best_bench:
+                    best_bench = bench
+                    best_solution = (nb_3v3, nb_2v2, nb_3v2)
+                elif bench == best_bench and best_solution:
+                    # Same bench count, choose based on preferences
+                    old_3v3, old_2v2, old_3v2 = best_solution
+
+                    if mode == TournamentMode.TRIPLETTE:
+                        # Prefer: more 3v3, fewer hybrids, then more 2v2
+                        if nb_3v3 > old_3v3:
+                            best_solution = (nb_3v3, nb_2v2, nb_3v2)
+                        elif nb_3v3 == old_3v3 and nb_3v2 < old_3v2:
+                            best_solution = (nb_3v3, nb_2v2, nb_3v2)
+                    else:  # DOUBLETTE mode
+                        # Prefer: more 2v2, fewer hybrids, then more 3v3
+                        if nb_2v2 > old_2v2:
+                            best_solution = (nb_3v3, nb_2v2, nb_3v2)
+                        elif nb_2v2 == old_2v2 and nb_3v2 < old_3v2:
+                            best_solution = (nb_3v3, nb_2v2, nb_3v2)
+
+    return best_solution or (0, 0, 0)
+
+
 def calculate_role_requirements(mode: TournamentMode, player_count: int) -> RoleRequirements:
     """Calculate required player counts by role.
+
+    New strategy: Find optimal combination to include ALL players.
+    Accepts hybrid 3v2 matches if needed to avoid benching players.
 
     Args:
         mode: Tournament mode
@@ -153,32 +214,31 @@ def calculate_role_requirements(mode: TournamentMode, player_count: int) -> Role
     Returns:
         Role requirements
     """
+    # Find optimal distribution
+    nb_3v3, nb_2v2, nb_3v2 = _find_optimal_match_distribution(player_count, mode)
+
+    # Calculate team counts (NOT including hybrid teams here, they're separate)
+    triplette_teams = nb_3v3 * 2  # Each 3v3 match = 2 triplette teams
+    doublette_teams = nb_2v2 * 2  # Each 2v2 match = 2 doublette teams
+
+    # For role calculations, we need to count ALL teams including hybrid
+    total_triplette_teams = triplette_teams + nb_3v2  # Hybrid contributes 1 triplette team
+    total_doublette_teams = doublette_teams + nb_3v2  # Hybrid contributes 1 doublette team
+
+    # Calculate role needs based on teams
+    # With multiple roles, we count how many players should be ABLE to play each role
     if mode == TournamentMode.TRIPLETTE:
-        # Prefer triplette: need 1 TIREUR, 1 POINTEUR, 1 MILIEU per team
-        # For 6n players: n triplette matches = 2n teams = 2n of each role
-        # For 6n+k players: adapt with doublettes
+        # Each triplette team needs: 1 TIREUR, 1 POINTEUR, 1 MILIEU
+        tireur_needed = total_triplette_teams
+        pointeur_needed = total_triplette_teams
+        milieu_needed = total_triplette_teams
 
-        triplette_teams = player_count // 3  # Max possible triplette teams
-        # We need even number of teams
-        if triplette_teams % 2 == 1:
-            triplette_teams -= 1
-
-        triplette_players = triplette_teams * 3
-        remaining = player_count - triplette_players
-
-        # Remaining players form doublette teams (if possible)
-        doublette_teams = remaining // 2
-        if doublette_teams % 2 == 1:
-            doublette_teams -= 1
-
-        # Triplette needs: equal counts of each role
-        tireur_needed = triplette_teams
-        pointeur_needed = triplette_teams
-        milieu_needed = triplette_teams
-
-        # Doublette needs: 1 TIREUR + 1 POINTEUR_MILIEU per team
-        tireur_needed += doublette_teams
-        pointeur_milieu_needed = doublette_teams
+        # Each doublette team needs: 1 TIREUR, 1 (POINTEUR or MILIEU)
+        tireur_needed += total_doublette_teams
+        # For doublettes: ideally split between pointeur and milieu
+        # Add to both counters (players can have multiple roles)
+        pointeur_needed += total_doublette_teams // 2 + total_doublette_teams % 2
+        milieu_needed += total_doublette_teams // 2
 
         return RoleRequirements(
             mode=mode,
@@ -186,44 +246,32 @@ def calculate_role_requirements(mode: TournamentMode, player_count: int) -> Role
             tireur_needed=tireur_needed,
             pointeur_needed=pointeur_needed,
             milieu_needed=milieu_needed,
-            pointeur_milieu_needed=pointeur_milieu_needed,
-            triplette_count=triplette_teams,
-            doublette_count=doublette_teams,
+            triplette_count=nb_3v3,
+            doublette_count=nb_2v2,
+            hybrid_count=nb_3v2,
         )
-    else:  # DOUBLETTE
-        # Prefer doublette: need 1 TIREUR, 1 POINTEUR_MILIEU per team
-        # For 4n players: n doublette matches = 2n teams
+    else:  # DOUBLETTE mode
+        # Each doublette team needs: 1 TIREUR, 1 (POINTEUR or MILIEU)
+        tireur_needed = total_doublette_teams
+        # For doublettes: split between pointeur and milieu
+        pointeur_needed = total_doublette_teams // 2 + total_doublette_teams % 2
+        milieu_needed = total_doublette_teams // 2
 
-        doublette_teams = player_count // 2
-        if doublette_teams % 2 == 1:
-            doublette_teams -= 1
-
-        doublette_players = doublette_teams * 2
-        remaining = player_count - doublette_players
-
-        # Remaining players form triplette teams (if possible)
-        triplette_teams = remaining // 3
-        if triplette_teams % 2 == 1:
-            triplette_teams -= 1
-
-        # Doublette needs
-        tireur_needed = doublette_teams
-        pointeur_milieu_needed = doublette_teams
-
-        # Triplette needs (fallback): map roles
-        # For triplette in doublette mode: 1 TIREUR + 2 POINTEUR_MILIEU
-        tireur_needed += triplette_teams
-        pointeur_milieu_needed += triplette_teams * 2
+        # Each triplette team needs: 1 TIREUR, 2 (POINTEUR or MILIEU)
+        tireur_needed += total_triplette_teams
+        # For triplettes in doublette mode: need more pointeur/milieu
+        pointeur_needed += total_triplette_teams
+        milieu_needed += total_triplette_teams
 
         return RoleRequirements(
             mode=mode,
             total_players=player_count,
             tireur_needed=tireur_needed,
-            pointeur_needed=0,
-            milieu_needed=0,
-            pointeur_milieu_needed=pointeur_milieu_needed,
-            triplette_count=triplette_teams,
-            doublette_count=doublette_teams,
+            pointeur_needed=pointeur_needed,
+            milieu_needed=milieu_needed,
+            triplette_count=nb_3v3,
+            doublette_count=nb_2v2,
+            hybrid_count=nb_3v2,
         )
 
 
@@ -240,36 +288,39 @@ def validate_team_roles(
     Returns:
         True if valid, False otherwise
     """
-    roles = [p.role for p in team]
-
     if match_format == MatchFormat.TRIPLETTE:
         if len(team) != 3:
             return False
         if mode == TournamentMode.TRIPLETTE:
             # Need exactly: 1 TIREUR, 1 POINTEUR, 1 MILIEU
-            return (
-                roles.count(PlayerRole.TIREUR) == 1
-                and roles.count(PlayerRole.POINTEUR) == 1
-                and roles.count(PlayerRole.MILIEU) == 1
-            )
+            has_tireur = sum(1 for p in team if PlayerRole.TIREUR in p.roles)
+            has_pointeur = sum(1 for p in team if PlayerRole.POINTEUR in p.roles)
+            has_milieu = sum(1 for p in team if PlayerRole.MILIEU in p.roles)
+            return has_tireur >= 1 and has_pointeur >= 1 and has_milieu >= 1
         else:
-            # DOUBLETTE mode with triplette fallback: 1 TIREUR + 2 POINTEUR_MILIEU
-            return (
-                roles.count(PlayerRole.TIREUR) == 1 and roles.count(PlayerRole.POINTEUR_MILIEU) == 2
+            # DOUBLETTE mode with triplette fallback: 1 TIREUR + 2 (POINTEUR or MILIEU)
+            has_tireur = sum(1 for p in team if PlayerRole.TIREUR in p.roles)
+            has_pointeur_or_milieu = sum(
+                1 for p in team if PlayerRole.POINTEUR in p.roles or PlayerRole.MILIEU in p.roles
             )
+            return has_tireur >= 1 and has_pointeur_or_milieu >= 2
     else:  # DOUBLETTE
         if len(team) != 2:
             return False
         if mode == TournamentMode.DOUBLETTE:
-            # Need exactly: 1 TIREUR, 1 POINTEUR_MILIEU
-            return (
-                roles.count(PlayerRole.TIREUR) == 1 and roles.count(PlayerRole.POINTEUR_MILIEU) == 1
+            # Need exactly: 1 TIREUR, 1 (POINTEUR or MILIEU)
+            has_tireur = sum(1 for p in team if PlayerRole.TIREUR in p.roles)
+            has_pointeur_or_milieu = sum(
+                1 for p in team if PlayerRole.POINTEUR in p.roles or PlayerRole.MILIEU in p.roles
             )
+            return has_tireur >= 1 and has_pointeur_or_milieu >= 1
         else:
-            # TRIPLETTE mode with doublette fallback: 1 TIREUR + 1 POINTEUR (or MILIEU)
-            return roles.count(PlayerRole.TIREUR) == 1 and (
-                roles.count(PlayerRole.POINTEUR) == 1 or roles.count(PlayerRole.MILIEU) == 1
+            # TRIPLETTE mode with doublette fallback: 1 TIREUR + 1 (POINTEUR or MILIEU)
+            has_tireur = sum(1 for p in team if PlayerRole.TIREUR in p.roles)
+            has_pointeur_or_milieu = sum(
+                1 for p in team if PlayerRole.POINTEUR in p.roles or PlayerRole.MILIEU in p.roles
             )
+            return has_tireur >= 1 and has_pointeur_or_milieu >= 1
 
     return False
 
@@ -372,7 +423,10 @@ class TournamentScheduler:
         players: list[Player],
         round_index: int,
     ) -> list[Match]:
-        """Generate matches for a round.
+        """Generate matches for a round using optimal distribution.
+
+        New strategy: Use _find_optimal_match_distribution to determine
+        the best mix of 3v3, 2v2, and 3v2 matches to include ALL players.
 
         Args:
             players: List of players
@@ -388,69 +442,104 @@ class TournamentScheduler:
         available_players = players.copy()
         terrain_index = 0
 
-        # Determine preferred format
-        preferred_format = (
-            MatchFormat.TRIPLETTE
-            if self.mode == TournamentMode.TRIPLETTE
-            else MatchFormat.DOUBLETTE
-        )
-        team_size = 3 if preferred_format == MatchFormat.TRIPLETTE else 2
+        # Get optimal distribution
+        nb_3v3, nb_2v2, nb_3v2 = _find_optimal_match_distribution(len(players), self.mode)
 
-        while len(available_players) >= team_size * 2 and terrain_index < self.terrains_count:
-            # Try to form two teams with preferred format
-            team_a = self._form_team(available_players, team_size, preferred_format)
-            if team_a is None:
-                # Try fallback format
-                fallback_format = (
-                    MatchFormat.DOUBLETTE
-                    if preferred_format == MatchFormat.TRIPLETTE
-                    else MatchFormat.TRIPLETTE
-                )
-                fallback_size = 2 if fallback_format == MatchFormat.DOUBLETTE else 3
+        # Generate 3v3 matches
+        for _ in range(nb_3v3):
+            if len(available_players) < 6:
+                break
 
-                if len(available_players) >= fallback_size * 2:
-                    team_a = self._form_team(available_players, fallback_size, fallback_format)
-                    if team_a:
-                        team_size = fallback_size
-                        preferred_format = fallback_format
-
+            team_a = self._form_team(available_players, 3, MatchFormat.TRIPLETTE)
             if team_a is None:
                 break
 
-            # Remove team_a players
             for player in team_a:
                 available_players.remove(player)
 
-            # Form team B
-            team_b = self._form_team(available_players, team_size, preferred_format)
+            team_b = self._form_team(available_players, 3, MatchFormat.TRIPLETTE)
             if team_b is None:
-                # Can't form second team, put team_a back and stop
+                # Can't form second team, put team_a back
                 available_players.extend(team_a)
                 break
 
-            # Remove team_b players
             for player in team_b:
                 available_players.remove(player)
 
-            # Create match
             terrain_label = get_terrain_label(terrain_index)
             match = Match(
                 round_index=round_index,
                 terrain_label=terrain_label,
-                format=preferred_format,
+                format=MatchFormat.TRIPLETTE,
                 team_a_player_ids=[p.id for p in team_a if p.id is not None],
                 team_b_player_ids=[p.id for p in team_b if p.id is not None],
             )
             matches.append(match)
             terrain_index += 1
 
-            # Reset to preferred format for next match
-            preferred_format = (
-                MatchFormat.TRIPLETTE
-                if self.mode == TournamentMode.TRIPLETTE
-                else MatchFormat.DOUBLETTE
+        # Generate 2v2 matches
+        for _ in range(nb_2v2):
+            if len(available_players) < 4:
+                break
+
+            team_a = self._form_team(available_players, 2, MatchFormat.DOUBLETTE)
+            if team_a is None:
+                break
+
+            for player in team_a:
+                available_players.remove(player)
+
+            team_b = self._form_team(available_players, 2, MatchFormat.DOUBLETTE)
+            if team_b is None:
+                available_players.extend(team_a)
+                break
+
+            for player in team_b:
+                available_players.remove(player)
+
+            terrain_label = get_terrain_label(terrain_index)
+            match = Match(
+                round_index=round_index,
+                terrain_label=terrain_label,
+                format=MatchFormat.DOUBLETTE,
+                team_a_player_ids=[p.id for p in team_a if p.id is not None],
+                team_b_player_ids=[p.id for p in team_b if p.id is not None],
             )
-            team_size = 3 if preferred_format == MatchFormat.TRIPLETTE else 2
+            matches.append(match)
+            terrain_index += 1
+
+        # Generate 3v2 hybrid matches
+        for _ in range(nb_3v2):
+            if len(available_players) < 5:
+                break
+
+            # Form triplette team first
+            team_3 = self._form_team(available_players, 3, MatchFormat.TRIPLETTE)
+            if team_3 is None:
+                break
+
+            for player in team_3:
+                available_players.remove(player)
+
+            # Form doublette team
+            team_2 = self._form_team(available_players, 2, MatchFormat.DOUBLETTE)
+            if team_2 is None:
+                available_players.extend(team_3)
+                break
+
+            for player in team_2:
+                available_players.remove(player)
+
+            terrain_label = get_terrain_label(terrain_index)
+            match = Match(
+                round_index=round_index,
+                terrain_label=terrain_label,
+                format=MatchFormat.HYBRID,
+                team_a_player_ids=[p.id for p in team_3 if p.id is not None],
+                team_b_player_ids=[p.id for p in team_2 if p.id is not None],
+            )
+            matches.append(match)
+            terrain_index += 1
 
         if not matches:
             raise ValueError("Could not generate any matches")
@@ -474,60 +563,47 @@ class TournamentScheduler:
             List of players forming a valid team, or None if impossible
         """
         # Required roles based on format and mode
+        # Each item is either a single role or a list of alternative roles
+        needed_roles: list[PlayerRole | list[PlayerRole]] = []
+
         if match_format == MatchFormat.TRIPLETTE:
             if self.mode == TournamentMode.TRIPLETTE:
+                # Need: 1 TIREUR, 1 POINTEUR, 1 MILIEU
                 needed_roles = [PlayerRole.TIREUR, PlayerRole.POINTEUR, PlayerRole.MILIEU]
             else:
+                # DOUBLETTE mode with triplette fallback: 1 TIREUR + 2 (POINTEUR or MILIEU)
                 needed_roles = [
                     PlayerRole.TIREUR,
-                    PlayerRole.POINTEUR_MILIEU,
-                    PlayerRole.POINTEUR_MILIEU,
+                    [PlayerRole.POINTEUR, PlayerRole.MILIEU],
+                    [PlayerRole.POINTEUR, PlayerRole.MILIEU],
                 ]
         else:  # DOUBLETTE
             if self.mode == TournamentMode.DOUBLETTE:
-                needed_roles = [PlayerRole.TIREUR, PlayerRole.POINTEUR_MILIEU]
+                # Need: 1 TIREUR, 1 (POINTEUR or MILIEU)
+                needed_roles = [PlayerRole.TIREUR, [PlayerRole.POINTEUR, PlayerRole.MILIEU]]
             else:
-                # Fallback in TRIPLETTE mode: 1 TIREUR + 1 (POINTEUR or MILIEU)
-                needed_roles = [PlayerRole.TIREUR, PlayerRole.POINTEUR]  # Or MILIEU
+                # TRIPLETTE mode with doublette fallback: 1 TIREUR + 1 (POINTEUR or MILIEU)
+                needed_roles = [PlayerRole.TIREUR, [PlayerRole.POINTEUR, PlayerRole.MILIEU]]
 
         # Try to find players matching needed roles
         team: list[Player] = []
-        remaining_roles = needed_roles.copy()
         remaining_players = available_players.copy()
 
-        # Special handling for TRIPLETTE mode doublette fallback
-        if (
-            self.mode == TournamentMode.TRIPLETTE
-            and match_format == MatchFormat.DOUBLETTE
-            and len(remaining_roles) == 2
-        ):
-            # Need 1 TIREUR + 1 (POINTEUR or MILIEU)
-            # Find TIREUR
-            tireur = next((p for p in remaining_players if p.role == PlayerRole.TIREUR), None)
-            if tireur is None:
-                return None
-            team.append(tireur)
-            remaining_players.remove(tireur)
+        for needed_role in needed_roles:
+            # Handle both single role and list of alternative roles
+            if isinstance(needed_role, list):
+                # Find a player with any of the roles in the list
+                player = next(
+                    (p for p in remaining_players if any(role in p.roles for role in needed_role)),
+                    None,
+                )
+            else:
+                # Find a player with the specific role
+                player = next((p for p in remaining_players if needed_role in p.roles), None)
 
-            # Find POINTEUR or MILIEU
-            second = next(
-                (
-                    p
-                    for p in remaining_players
-                    if p.role in (PlayerRole.POINTEUR, PlayerRole.MILIEU)
-                ),
-                None,
-            )
-            if second is None:
-                return None
-            team.append(second)
-            return team
-
-        # Standard role matching
-        for role in remaining_roles:
-            player = next((p for p in remaining_players if p.role == role), None)
             if player is None:
                 return None
+
             team.append(player)
             remaining_players.remove(player)
 
@@ -592,10 +668,14 @@ class TournamentScheduler:
                 if match.terrain_label in self.tracker.terrains[pid]:
                     repeated_terrains += 1
 
-            # Check fallback
+            # Check fallback/hybrid
+            # Hybrid is always considered a "fallback" (compromise)
+            # Pure wrong format is also a fallback
             is_fallback = (
-                self.mode == TournamentMode.TRIPLETTE and match.format == MatchFormat.DOUBLETTE
-            ) or (self.mode == TournamentMode.DOUBLETTE and match.format == MatchFormat.TRIPLETTE)
+                match.format == MatchFormat.HYBRID
+                or (self.mode == TournamentMode.TRIPLETTE and match.format == MatchFormat.DOUBLETTE)
+                or (self.mode == TournamentMode.DOUBLETTE and match.format == MatchFormat.TRIPLETTE)
+            )
 
             if is_fallback:
                 fallback_count += 1

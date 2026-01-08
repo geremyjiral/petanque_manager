@@ -25,7 +25,7 @@ def calculate_player_stats(
             stats_dict[player.id] = PlayerStats(
                 player_id=player.id,
                 player_name=player.name,
-                role=player.role,
+                roles=player.roles,
             )
 
     # Process completed matches
@@ -98,7 +98,7 @@ def get_player_stats(
     stats = PlayerStats(
         player_id=player_id,
         player_name="Unknown",  # Will be set by caller
-        role=None,  # type: ignore # Will be set by caller
+        roles=[],  # Will be set by caller
     )
 
     found = False

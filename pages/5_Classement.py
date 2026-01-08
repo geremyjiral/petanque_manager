@@ -71,7 +71,9 @@ def main() -> None:
         filtered_stats = [s for s in filtered_stats if s.matches_played >= min_matches]
 
     if role_filter:
-        filtered_stats = [s for s in filtered_stats if s.role.value in role_filter]
+        filtered_stats = [
+            s for s in filtered_stats if any(role.value in role_filter for role in s.roles)
+        ]
 
     if search_name:
         filtered_stats = [s for s in filtered_stats if search_name.lower() in s.player_name.lower()]
@@ -110,7 +112,7 @@ def main() -> None:
                 {
                     "Rang": idx,
                     "Joueur": stat.player_name,
-                    "Rôle": stat.role.value,
+                    "Rôle": ", ".join(role.value for role in stat.roles),
                     "Matchs": stat.matches_played,
                     "Victoires": stat.wins,
                     "Défaites": stat.losses,
@@ -244,7 +246,9 @@ def main() -> None:
 
     for idx, role in enumerate(PlayerRole):
         with role_tabs[idx]:
-            role_stats = [s for s in player_stats if s.role == role and s.matches_played > 0]
+            role_stats = [
+                s for s in player_stats if any(r == role for r in s.roles) and s.matches_played > 0
+            ]
 
             if not role_stats:
                 st.info(f"Aucun joueur {role.value} n’a encore de match terminé.")
