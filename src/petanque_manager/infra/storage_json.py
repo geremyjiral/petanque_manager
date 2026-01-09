@@ -310,6 +310,16 @@ class JSONStorage(TournamentStorage):
                 rounds.append(round_obj)
         return rounds
 
+    def delete_round(self, round_id: int) -> None:
+        """Delete a round and its matches."""
+        for i, r in enumerate(self.data["rounds"]):
+            if r["id"] == round_id:
+                del self.data["rounds"][i]
+                self._save()
+                return
+
+        raise ValueError(f"Round with ID {round_id} not found")
+
     def update_match(self, match: Match) -> Match:
         """Update an existing match."""
         if match.id is None:

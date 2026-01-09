@@ -17,6 +17,166 @@ from src.petanque_manager.core.scheduler import (
     validate_team_roles,
 )
 
+DOUBLETTE_ASSERT = {
+    4: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 1},
+    5: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 0},
+    6: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 0},
+    7: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 0},
+    8: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 2},
+    9: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 1},
+    10: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 1},
+    11: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 0},
+    12: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 3},
+    13: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 2},
+    14: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 2},
+    15: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 1},
+    16: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 4},
+    17: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 3},
+    18: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 3},
+    19: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 2},
+    20: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 5},
+    21: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 4},
+    22: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 4},
+    23: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 3},
+    24: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 6},
+    25: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 5},
+    26: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 5},
+    27: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 4},
+    28: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 7},
+    29: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 6},
+    30: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 6},
+    31: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 5},
+    32: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 8},
+    33: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 7},
+    34: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 7},
+    35: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 6},
+    36: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 9},
+    37: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 8},
+    38: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 8},
+    39: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 7},
+    40: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 10},
+    41: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 9},
+    42: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 9},
+    43: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 8},
+    44: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 11},
+    45: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 10},
+    46: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 10},
+    47: {MatchFormat.HYBRID: 1, MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 9},
+    48: {MatchFormat.HYBRID: 0, MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 12},
+}
+
+TRIPLETTE_ASSERTS = {
+    4: {MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    5: {MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    6: {MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    7: {MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    8: {MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 0},
+    9: {MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 1},
+    10: {MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    11: {MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    12: {MatchFormat.TRIPLETTE: 2, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    13: {MatchFormat.TRIPLETTE: 0, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 1},
+    14: {MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 0},
+    15: {MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 1},
+    16: {MatchFormat.TRIPLETTE: 2, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    17: {MatchFormat.TRIPLETTE: 2, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    18: {MatchFormat.TRIPLETTE: 3, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    19: {MatchFormat.TRIPLETTE: 1, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 1},
+    20: {MatchFormat.TRIPLETTE: 2, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 0},
+    21: {MatchFormat.TRIPLETTE: 2, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 1},
+    22: {MatchFormat.TRIPLETTE: 3, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    23: {MatchFormat.TRIPLETTE: 3, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    24: {MatchFormat.TRIPLETTE: 4, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    25: {MatchFormat.TRIPLETTE: 2, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 1},
+    26: {MatchFormat.TRIPLETTE: 3, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 0},
+    27: {MatchFormat.TRIPLETTE: 3, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 1},
+    28: {MatchFormat.TRIPLETTE: 4, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    29: {MatchFormat.TRIPLETTE: 4, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    30: {MatchFormat.TRIPLETTE: 5, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    31: {MatchFormat.TRIPLETTE: 3, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 1},
+    32: {MatchFormat.TRIPLETTE: 4, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 0},
+    33: {MatchFormat.TRIPLETTE: 4, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 1},
+    34: {MatchFormat.TRIPLETTE: 5, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    35: {MatchFormat.TRIPLETTE: 5, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    36: {MatchFormat.TRIPLETTE: 6, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    37: {MatchFormat.TRIPLETTE: 4, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 1},
+    38: {MatchFormat.TRIPLETTE: 5, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 0},
+    39: {MatchFormat.TRIPLETTE: 5, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 1},
+    40: {MatchFormat.TRIPLETTE: 6, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    41: {MatchFormat.TRIPLETTE: 6, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    42: {MatchFormat.TRIPLETTE: 7, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+    43: {MatchFormat.TRIPLETTE: 5, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 1},
+    44: {MatchFormat.TRIPLETTE: 6, MatchFormat.DOUBLETTE: 2, MatchFormat.HYBRID: 0},
+    45: {MatchFormat.TRIPLETTE: 6, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 1},
+    46: {MatchFormat.TRIPLETTE: 7, MatchFormat.DOUBLETTE: 1, MatchFormat.HYBRID: 0},
+    47: {MatchFormat.TRIPLETTE: 7, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 1},
+    48: {MatchFormat.TRIPLETTE: 8, MatchFormat.DOUBLETTE: 0, MatchFormat.HYBRID: 0},
+}
+
+
+def test_scheduler_generates_valid_round_doublette() -> None:
+    for num_players, asserts in DOUBLETTE_ASSERT.items():
+        players = [
+            Player(
+                id=i,
+                name=f"P{i}",
+                roles=[PlayerRole.TIREUR, PlayerRole.POINTEUR, PlayerRole.MILIEU],
+            )
+            for i in range(1, num_players + 1)
+        ]
+
+        scheduler = TournamentScheduler(mode=TournamentMode.DOUBLETTE, terrains_count=8)
+
+        round_obj, _quality_report = scheduler.generate_round(
+            players=players,
+            round_index=0,
+            previous_rounds=[],
+        )
+
+        format_counts = {
+            MatchFormat.DOUBLETTE: 0,
+            MatchFormat.TRIPLETTE: 0,
+            MatchFormat.HYBRID: 0,
+        }
+
+        for match in round_obj.matches:
+            format_counts[match.format] += 1
+
+        for format in format_counts:
+            assert format_counts[format] == asserts[format], f"Failed for {num_players} players"
+
+
+def test_scheduler_generates_valid_round_triplette() -> None:
+    for num_players, asserts in TRIPLETTE_ASSERTS.items():
+        players = [
+            Player(
+                id=i,
+                name=f"P{i}",
+                roles=[PlayerRole.TIREUR, PlayerRole.POINTEUR, PlayerRole.MILIEU],
+            )
+            for i in range(1, num_players + 1)
+        ]
+
+        scheduler = TournamentScheduler(mode=TournamentMode.TRIPLETTE, terrains_count=8)
+
+        round_obj, _quality_report = scheduler.generate_round(
+            players=players,
+            round_index=0,
+            previous_rounds=[],
+        )
+
+        format_counts = {
+            MatchFormat.DOUBLETTE: 0,
+            MatchFormat.TRIPLETTE: 0,
+            MatchFormat.HYBRID: 0,
+        }
+
+        for match in round_obj.matches:
+            format_counts[match.format] += 1
+
+        for format in format_counts:
+            assert format_counts[format] == asserts[format], f"Failed for {num_players} players"
+
 
 def test_calculate_role_requirements_triplette() -> None:
     """Test role requirements calculation for TRIPLETTE mode."""

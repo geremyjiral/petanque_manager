@@ -154,6 +154,15 @@ class TournamentStorage(ABC):
         pass
 
     @abstractmethod
+    def delete_round(self, round_id: int) -> None:
+        """Delete a round and its matches.
+
+        Args:
+            round_id: Round ID
+        """
+        pass
+
+    @abstractmethod
     def update_match(self, match: Match) -> Match:
         """Update an existing match (e.g., to add scores).
 

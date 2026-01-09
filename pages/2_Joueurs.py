@@ -15,7 +15,7 @@ def main() -> None:
         page_icon="👥",
         layout="wide",
     )
-
+    show_info_toast()
     show_login_form()
 
     st.title("👥 Gestion des joueurs")
@@ -214,6 +214,7 @@ def main() -> None:
             success_count = 0
             update_count = 0
             add_count = 0
+            delete_count = 0
 
             try:
                 # Valider et sauvegarder chaque ligne
@@ -245,14 +246,29 @@ def main() -> None:
                         active = bool(row["Actif"])
 
                         # Nouveau joueur (ID = 0 ou None)
-                        if player_id is None or player_id == 0:
+                        if (
+                            player_id is None
+                            or player_id == 0
+                            or not any(p.id == player_id for p in all_players)
+                        ):
                             player = Player(name=name, roles=roles, active=active)
+                            if player_id is not None and player_id > 0:
+                                player.id = player_id
                             storage.add_player(player)
                             add_count += 1
                         else:
                             # Mise à jour d'un joueur existant
                             existing_player = storage.get_player(player_id)
                             if existing_player:
+                                is_update = False
+                                if existing_player.name != name:
+                                    is_update = True
+                                if set(existing_player.roles) != set(roles):
+                                    is_update = True
+                                if existing_player.active != active:
+                                    is_update = True
+                                if not is_update:
+                                    continue
                                 updated_player = Player(
                                     id=player_id,
                                     name=name,
@@ -274,26 +290,43 @@ def main() -> None:
                         errors.append(f"Ligne {line_num}: {str(e)}")
                     except Exception as e:
                         errors.append(f"Ligne {line_num}: Erreur inattendue - {str(e)}")
+                for player_db in all_players:
+                    try:
+                        if player_db.id and player_db.id > 0:
+                            if not any(
+                                int(row["ID"]) == player_db.id
+                                for _, row in edited_df.iterrows()
+                                if row["ID"] and row["ID"] > 0
+                            ):
+                                # Supprimer le joueur
+                                storage.delete_player(player_db.id)
+                                delete_count += 1
+                                success_count += 1
+
+                    except ValueError as e:
+                        errors.append(f"Suppresion {player_db.name}: {str(e)}")
+                    except Exception as e:
+                        errors.append(f"Suppresion {player_db.name}: Erreur inattendue - {str(e)}")
 
                 # Afficher les résultats
                 if success_count > 0:
-                    msg = f"✅ {success_count} joueur(s) sauvegardé(s)"
+                    msg = "Succès :"
+                    msgs: list[str] = []
                     if add_count > 0:
-                        msg += f" ({add_count} ajouté(s)"
+                        msgs.append(f" {add_count} ajouté(s)")
                     if update_count > 0:
-                        msg += (
-                            f", {update_count} modifié(s)"
-                            if add_count > 0
-                            else f" ({update_count} modifié(s)"
-                        )
-                    if add_count > 0 or update_count > 0:
-                        msg += ")"
+                        msgs.append(f" {update_count} modifié(s)")
+                    if delete_count > 0:
+                        msgs.append(f" {delete_count} supprimé(s)")
+                    msg += ",".join(msgs)
                     st.success(msg)
+                    st.session_state["info_toast"].append({"txt": msg, "ico": "✅"})
 
                 if errors:
                     st.error("❌ Erreurs détectées :")
                     for error in errors:
                         st.write(f"• {error}")
+                        st.session_state["info_toast"].append({"txt": error, "ico": "❌"})
 
                 if success_count > 0:
                     st.rerun()
@@ -325,5 +358,18 @@ def main() -> None:
     )
 
 
+def init_toast_workaround() -> None:
+    if "info_toast" not in st.session_state:
+        st.session_state["info_toast"] = []
+
+
+def show_info_toast():
+    if "info_toast" in st.session_state:
+        for info in st.session_state["info_toast"]:
+            st.toast(info.get("txt"), icon=info.get("ico"))
+        st.session_state["info_toast"] = []
+
+
 if __name__ == "__main__":
+    init_toast_workaround()
     main()

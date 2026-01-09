@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from Acceuil import get_storage
-from src.petanque_manager.core.models import Player
+from src.petanque_manager.core.models import Player, ScheduleQualityReport
 from src.petanque_manager.core.scheduler import TournamentScheduler
 from src.petanque_manager.infra.auth import is_authenticated, show_login_form
 
@@ -109,68 +109,70 @@ def main() -> None:
                                     round_index=next_round_index,
                                     previous_rounds=rounds,
                                 )
-
+                                st.session_state["quality_report"] = quality_report
                                 # Sauvegarde
                                 storage.add_round(round_obj)
-
-                                st.success(f"✅ Manche {next_round_index + 1} générée !")
-
-                                # Rapport de qualité
-                                st.subheader("📊 Rapport de qualité")
-
-                                (
-                                    quality_col1,
-                                    quality_col2,
-                                    quality_col3,
-                                    quality_col4,
-                                    quality_col5,
-                                ) = st.columns(5)
-
-                                with quality_col1:
-                                    st.metric("Note", quality_report.quality_grade)
-
-                                with quality_col2:
-                                    st.metric(
-                                        "Partenaires répétés",
-                                        quality_report.repeated_partners,
-                                        help="Paires de joueurs jouant ensemble plus d’une fois",
-                                    )
-
-                                with quality_col3:
-                                    st.metric(
-                                        "Adversaires répétés",
-                                        quality_report.repeated_opponents,
-                                        help="Paires de joueurs s’affrontant plus d’une fois",
-                                    )
-
-                                with quality_col4:
-                                    st.metric(
-                                        "Terrains répétés",
-                                        quality_report.repeated_terrains,
-                                        help="Joueurs jouant sur le même terrain plus d’une fois",
-                                    )
-
-                                with quality_col5:
-                                    st.metric(
-                                        "Matchs en format alternatif",
-                                        quality_report.fallback_format_count,
-                                        help="Matchs joués dans le format non prioritaire",
-                                    )
-
-                                if quality_report.quality_grade in ["A+", "A", "B"]:
-                                    st.success("🎉 Excellente qualité de planning !")
-                                elif quality_report.quality_grade == "C":
-                                    st.info("👍 Bonne qualité de planning")
-                                else:
-                                    st.warning(
-                                        "⚠️ La qualité du planning pourrait être améliorée. "
-                                        "Essayez de régénérer avec une autre graine (seed)."
-                                    )
 
                                 st.rerun()
 
                         except ValueError as e:
                             st.error(f"❌ Erreur lors de la génération : {e}")
+                    if "quality_report" in st.session_state:
+                        quality_report: ScheduleQualityReport = st.session_state["quality_report"]
+
+                        st.success(f"✅ Manche {next_round_index} générée !")
+
+                        # Rapport de qualité
+                        st.subheader("📊 Rapport de qualité")
+
+                        (
+                            quality_col1,
+                            quality_col2,
+                            quality_col3,
+                            quality_col4,
+                            quality_col5,
+                        ) = st.columns(5)
+
+                        with quality_col1:
+                            st.metric("Note", quality_report.quality_grade)
+
+                        with quality_col2:
+                            st.metric(
+                                "Partenaires répétés",
+                                quality_report.repeated_partners,
+                                help="Paires de joueurs jouant ensemble plus d’une fois",
+                            )
+
+                        with quality_col3:
+                            st.metric(
+                                "Adversaires répétés",
+                                quality_report.repeated_opponents,
+                                help="Paires de joueurs s’affrontant plus d’une fois",
+                            )
+
+                        with quality_col4:
+                            st.metric(
+                                "Terrains répétés",
+                                quality_report.repeated_terrains,
+                                help="Joueurs jouant sur le même terrain plus d’une fois",
+                            )
+
+                        with quality_col5:
+                            st.metric(
+                                "Matchs en format alternatif",
+                                quality_report.fallback_format_count,
+                                help="Matchs joués dans le format non prioritaire",
+                            )
+
+                        if quality_report.quality_grade in ["A+", "A", "B"]:
+                            st.success("🎉 Excellente qualité de planning !")
+                        elif quality_report.quality_grade == "C":
+                            st.info("👍 Bonne qualité de planning")
+                        else:
+                            st.warning(
+                                "⚠️ La qualité du planning pourrait être améliorée. "
+                                "Essayez de régénérer avec une autre graine (seed)."
+                            )
     else:
         st.info(
             "🔒 Connexion requise pour générer des manches. Consultez les manches existantes ci-dessous."
@@ -191,7 +193,7 @@ def main() -> None:
                     (completed_matches / total_matches * 100) if total_matches > 0 else 0
                 )
 
-                round_col1, round_col2, round_col3 = st.columns(3)
+                round_col1, round_col2, round_col3, round_col4 = st.columns(4)
 
                 with round_col1:
                     st.metric("Matchs", total_matches)
@@ -201,6 +203,15 @@ def main() -> None:
 
                 with round_col3:
                     st.metric("Avancement", f"{completion_pct:.0f}%")
+                with round_col4:
+                    if st.button(
+                        "Supprimer la manche",
+                        type="secondary",
+                        key=f"delete_round_{round_obj.id}",
+                    ):
+                        if round_obj.id:
+                            storage.delete_round(round_obj.id)
+                            st.rerun()
 
                 # Liste des matchs
                 st.subheader("🎯 Liste des matchs")
@@ -221,10 +232,16 @@ def main() -> None:
                                 team_b_players.append(player)
 
                         team_a_display = " + ".join(
-                            [f"{p.name} ({', '.join(r.value for r in p.roles)})" for p in team_a_players]
+                            [
+                                f"{p.name} ({', '.join(r.value for r in p.roles)})"
+                                for p in team_a_players
+                            ]
                         )
                         team_b_display = " + ".join(
-                            [f"{p.name} ({', '.join(r.value for r in p.roles)})" for p in team_b_players]
+                            [
+                                f"{p.name} ({', '.join(r.value for r in p.roles)})"
+                                for p in team_b_players
+                            ]
                         )
 
                         match_col1, match_col2, match_col3 = st.columns([1, 2, 1])

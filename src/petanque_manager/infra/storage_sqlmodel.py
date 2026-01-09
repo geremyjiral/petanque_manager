@@ -183,7 +183,7 @@ class SQLModelStorage(TournamentStorage):
             if active_only:
                 query = query.where(PlayerDB.active == True)  # noqa: E712
 
-            players_db = session.exec(query).all()
+            players_db = session.exec(query.order_by(col(PlayerDB.id))).all()
 
             return [
                 Player(
@@ -349,6 +349,22 @@ class SQLModelStorage(TournamentStorage):
                     rounds.append(round_obj)
 
             return rounds
+
+    def delete_round(self, round_id: int) -> None:
+        """Delete a round and its matches."""
+        with Session(self.engine) as session:
+            round_db = session.get(RoundDB, round_id)
+            if not round_db:
+                raise ValueError(f"Round with ID {round_id} not found")
+
+            # Delete matches first
+            matches = session.exec(select(MatchDB).where(MatchDB.round_id == round_id)).all()
+            for match in matches:
+                session.delete(match)
+
+            # Delete round
+            session.delete(round_db)
+            session.commit()
 
     def update_match(self, match: Match) -> Match:
         """Update an existing match."""
