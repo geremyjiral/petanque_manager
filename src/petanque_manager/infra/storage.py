@@ -13,6 +13,10 @@ class TournamentStorage(ABC):
     """Abstract interface for tournament data storage."""
 
     @abstractmethod
+    def __init__(self, db_path: str = "tournament.db") -> None:
+        super().__init__()
+
+    @abstractmethod
     def initialize(self) -> None:
         """Initialize storage (create tables, files, etc.).
 

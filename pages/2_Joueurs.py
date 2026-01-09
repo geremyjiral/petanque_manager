@@ -67,7 +67,7 @@ def main() -> None:
         st.subheader("📋 Besoins par rôle")
         req_cols = st.columns(3)
 
-        idx = 0
+        idx_role = 0
         roles_to_show = [
             (PlayerRole.TIREUR, requirements.tireur_needed),
             (PlayerRole.POINTEUR, requirements.pointeur_needed),
@@ -75,7 +75,7 @@ def main() -> None:
         ]
 
         for role, needed in roles_to_show:
-            with req_cols[idx]:
+            with req_cols[idx_role]:
                 # Count players who CAN play this role (have it in their roles list)
                 current = sum(1 for p in active_players if role in p.roles)
                 deficit = needed - current
@@ -86,7 +86,7 @@ def main() -> None:
                     delta=f"{deficit:+d}" if deficit != 0 else "✓",
                     delta_color="inverse" if deficit > 0 else "normal",
                 )
-            idx += 1
+            idx_role += 1
 
         if any(
             (needed - sum(1 for p in active_players if role in p.roles)) != 0
@@ -363,7 +363,7 @@ def init_toast_workaround() -> None:
         st.session_state["info_toast"] = []
 
 
-def show_info_toast():
+def show_info_toast() -> None:
     if "info_toast" in st.session_state:
         for info in st.session_state["info_toast"]:
             st.toast(info.get("txt"), icon=info.get("ico"))

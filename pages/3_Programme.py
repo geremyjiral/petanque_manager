@@ -118,7 +118,9 @@ def main() -> None:
                         except ValueError as e:
                             st.error(f"❌ Erreur lors de la génération : {e}")
                     if "quality_report" in st.session_state:
-                        quality_report: ScheduleQualityReport = st.session_state["quality_report"]
+                        quality_report_prev: ScheduleQualityReport = st.session_state[
+                            "quality_report"
+                        ]
 
                         st.success(f"✅ Manche {next_round_index} générée !")
 
@@ -134,39 +136,39 @@ def main() -> None:
                         ) = st.columns(5)
 
                         with quality_col1:
-                            st.metric("Note", quality_report.quality_grade)
+                            st.metric("Note", quality_report_prev.quality_grade)
 
                         with quality_col2:
                             st.metric(
                                 "Partenaires répétés",
-                                quality_report.repeated_partners,
+                                quality_report_prev.repeated_partners,
                                 help="Paires de joueurs jouant ensemble plus d’une fois",
                             )
 
                         with quality_col3:
                             st.metric(
                                 "Adversaires répétés",
-                                quality_report.repeated_opponents,
+                                quality_report_prev.repeated_opponents,
                                 help="Paires de joueurs s’affrontant plus d’une fois",
                             )
 
                         with quality_col4:
                             st.metric(
                                 "Terrains répétés",
-                                quality_report.repeated_terrains,
+                                quality_report_prev.repeated_terrains,
                                 help="Joueurs jouant sur le même terrain plus d’une fois",
                             )
 
                         with quality_col5:
                             st.metric(
                                 "Matchs en format alternatif",
-                                quality_report.fallback_format_count,
+                                quality_report_prev.fallback_format_count,
                                 help="Matchs joués dans le format non prioritaire",
                             )
 
-                        if quality_report.quality_grade in ["A+", "A", "B"]:
+                        if quality_report_prev.quality_grade in ["A+", "A", "B"]:
                             st.success("🎉 Excellente qualité de planning !")
-                        elif quality_report.quality_grade == "C":
+                        elif quality_report_prev.quality_grade == "C":
                             st.info("👍 Bonne qualité de planning")
                         else:
                             st.warning(

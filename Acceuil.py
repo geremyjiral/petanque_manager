@@ -61,7 +61,7 @@ def load_or_create_config() -> TournamentConfig:
     ]
     for backend_class, path_attr in storages:
         try:
-            storage = backend_class(path_attr)  # pyright: ignore[reportCallIssue]
+            storage = backend_class(path_attr)
             storage.initialize()
             config = storage.load_config()
             if config:

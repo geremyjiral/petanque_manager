@@ -270,8 +270,8 @@ def get_tournament_summary(
     avg_points_per_match = total_points / len(completed_matches) if completed_matches else 0.0
 
     # Count formats
-    triplette_count = sum(1 for m in matches if m.format == TournamentMode.TRIPLETTE)
-    doublette_count = sum(1 for m in matches if m.format == TournamentMode.DOUBLETTE)
+    triplette_count = sum(True for m in matches if m.format.value == TournamentMode.TRIPLETTE)
+    doublette_count = sum(True for m in matches if m.format.value == TournamentMode.DOUBLETTE)
 
     return {
         "total_players": len(players),
