@@ -28,7 +28,7 @@ jobs:
 
       - name: Type check with mypy
         run: |
-          uv run mypy src/ app.py pages/ --ignore-missing-imports
+          uv run mypy src/ Acceuil.py pages/ --ignore-missing-imports
 
       - name: Test with pytest
         run: |
