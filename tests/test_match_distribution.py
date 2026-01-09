@@ -11,7 +11,7 @@ from src.petanque_manager.core.models import (
 )
 from src.petanque_manager.core.scheduler import (
     TournamentScheduler,
-    _find_optimal_match_distribution,
+    _find_optimal_match_distribution,  # pyright: ignore[reportPrivateUsage]
     calculate_role_requirements,
 )
 
@@ -119,7 +119,7 @@ class TestHybridMatchGeneration:
 
     def create_players(self, count: int) -> list[Player]:
         """Helper to create test players."""
-        players = []
+        players: list[Player] = []
         for i in range(count):
             # Distribute roles to ensure matches can be formed
             if i % 3 == 0:
@@ -132,7 +132,7 @@ class TestHybridMatchGeneration:
             players.append(
                 Player(
                     id=i + 1,
-                    name=f"Player {i+1}",
+                    name=f"Player {i + 1}",
                     roles=roles,
                     active=True,
                 )
@@ -192,7 +192,7 @@ class TestHybridMatchGeneration:
         players = self.create_players(5)
         scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
 
-        round_obj, quality_report = scheduler.generate_round(players, 0, [])
+        round_obj, _quality_report = scheduler.generate_round(players, 0, [])
 
         # Should have 1 match
         assert len(round_obj.matches) == 1
@@ -210,10 +210,10 @@ class TestHybridMatchGeneration:
         players = self.create_players(10)
         scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
 
-        round_obj, quality_report = scheduler.generate_round(players, 0, [])
+        round_obj, _quality_report = scheduler.generate_round(players, 0, [])
 
         # Count total players in all matches
-        all_player_ids = set()
+        all_player_ids: set[int] = set()
         for match in round_obj.matches:
             all_player_ids.update(match.team_a_player_ids)
             all_player_ids.update(match.team_b_player_ids)
@@ -226,10 +226,10 @@ class TestHybridMatchGeneration:
         players = self.create_players(11)
         scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
 
-        round_obj, quality_report = scheduler.generate_round(players, 0, [])
+        round_obj, _quality_report = scheduler.generate_round(players, 0, [])
 
         # Count total players in all matches
-        all_player_ids = set()
+        all_player_ids: set[int] = set()
         for match in round_obj.matches:
             all_player_ids.update(match.team_a_player_ids)
             all_player_ids.update(match.team_b_player_ids)

@@ -126,21 +126,15 @@ class Match(BaseModel):
         if self.format == MatchFormat.TRIPLETTE:
             # Both teams must be 3 players
             if size_a != 3 or size_b != 3:
-                raise ValueError(
-                    f"Triplette format requires 3v3, got {size_a}v{size_b}"
-                )
+                raise ValueError(f"Triplette format requires 3v3, got {size_a}v{size_b}")
         elif self.format == MatchFormat.DOUBLETTE:
             # Both teams must be 2 players
             if size_a != 2 or size_b != 2:
-                raise ValueError(
-                    f"Doublette format requires 2v2, got {size_a}v{size_b}"
-                )
+                raise ValueError(f"Doublette format requires 2v2, got {size_a}v{size_b}")
         elif self.format == MatchFormat.HYBRID:
             # One team 3, one team 2 (order doesn't matter)
             if not ((size_a == 3 and size_b == 2) or (size_a == 2 and size_b == 3)):
-                raise ValueError(
-                    f"Hybrid format requires 3v2 or 2v3, got {size_a}v{size_b}"
-                )
+                raise ValueError(f"Hybrid format requires 3v2 or 2v3, got {size_a}v{size_b}")
 
         # Check no player plays against themselves
         all_players = set(self.team_a_player_ids + self.team_b_player_ids)
