@@ -100,7 +100,7 @@ def get_username() -> str | None:
         Username if authenticated, None otherwise
     """
     if is_authenticated():
-        return st.session_state.get("username")
+        return str(st.session_state.get("username"))
     return None
 
 

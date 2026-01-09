@@ -26,6 +26,7 @@ def main() -> None:
     if config is None:
         st.warning("⚠️ Veuillez d’abord configurer le tournoi sur la page d’accueil.")
         st.stop()
+        return
 
     can_edit = is_authenticated()
 
@@ -219,7 +220,7 @@ def main() -> None:
             try:
                 # Valider et sauvegarder chaque ligne
                 for idx, row in edited_df.iterrows():
-                    line_num = int(idx) + 1  # type: ignore
+                    line_num = int(idx) + 1  # pyright: ignore[reportArgumentType]
                     try:
                         # Validation du nom
                         name = str(row["Nom"]).strip()

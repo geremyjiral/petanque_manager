@@ -26,6 +26,7 @@ def main() -> None:
     if config is None:
         st.warning("⚠️ Veuillez d’abord configurer le tournoi sur la page d’accueil.")
         st.stop()
+        return
 
     can_edit = is_authenticated()
 
