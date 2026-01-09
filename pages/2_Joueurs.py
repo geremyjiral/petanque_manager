@@ -219,8 +219,8 @@ def main() -> None:
 
             try:
                 # Valider et sauvegarder chaque ligne
-                for idx, row in edited_df.iterrows():
-                    line_num = int(idx) + 1  # pyright: ignore[reportArgumentType]
+                for idx, (_, row) in enumerate(edited_df.iterrows()):
+                    line_num = idx + 1
                     try:
                         # Validation du nom
                         name = str(row["Nom"]).strip()
