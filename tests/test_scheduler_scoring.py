@@ -195,9 +195,8 @@ def test_calculate_role_requirements_triplette() -> None:
     # 14 players = 1x3v3 + 2x2v2 = 2 triplette teams + 4 doublette teams
     req = calculate_role_requirements(TournamentMode.TRIPLETTE, 14)
     assert req.tireur_needed == 6  # 2 (triplette) + 4 (doublette)
-    # For doublette teams, we split pointeur/milieu since each needs TIREUR + (POINTEUR or MILIEU)
-    assert req.pointeur_needed == 4  # 2 (triplette) + 2 (half of doublette)
-    assert req.milieu_needed == 4  # 2 (triplette) + 2 (half of doublette)
+    assert req.pointeur_needed == 6  # 2 (triplette) + 4 (doublette)
+    assert req.milieu_needed == 2  # 2 (triplette)
 
 
 def test_calculate_role_requirements_doublette() -> None:
@@ -205,15 +204,14 @@ def test_calculate_role_requirements_doublette() -> None:
     # 8 players = 4 doublette teams = 2 matches
     req = calculate_role_requirements(TournamentMode.DOUBLETTE, 8)
     assert req.tireur_needed == 4
-    # Doublette teams split between pointeur and milieu
-    assert req.pointeur_needed == 2
-    assert req.milieu_needed == 2
+    assert req.pointeur_needed == 4
+    assert req.milieu_needed == 0
 
     # 12 players = 6 doublette teams = 3 matches
     req = calculate_role_requirements(TournamentMode.DOUBLETTE, 12)
     assert req.tireur_needed == 6
-    assert req.pointeur_needed == 3
-    assert req.milieu_needed == 3
+    assert req.pointeur_needed == 6
+    assert req.milieu_needed == 0
 
     # 11 players = 1x3v3 + 1x3v2 (hybrid) = 2 trip teams + 1 hybrid
     req = calculate_role_requirements(TournamentMode.DOUBLETTE, 11)
@@ -429,9 +427,9 @@ def test_scheduler_handles_uneven_player_count() -> None:
         Player(id=4, name="P1", roles=[PlayerRole.POINTEUR]),
         Player(id=5, name="P2", roles=[PlayerRole.POINTEUR]),
         Player(id=6, name="P3", roles=[PlayerRole.POINTEUR]),
-        Player(id=7, name="M1", roles=[PlayerRole.MILIEU]),
-        Player(id=8, name="M2", roles=[PlayerRole.MILIEU]),
-        Player(id=9, name="M3", roles=[PlayerRole.MILIEU]),
+        Player(id=7, name="M1", roles=[PlayerRole.MILIEU, PlayerRole.TIREUR]),
+        Player(id=8, name="M2", roles=[PlayerRole.MILIEU, PlayerRole.TIREUR]),
+        Player(id=9, name="M3", roles=[PlayerRole.MILIEU, PlayerRole.TIREUR]),
         Player(id=10, name="PM1", roles=[PlayerRole.POINTEUR, PlayerRole.MILIEU]),
         Player(id=11, name="PM2", roles=[PlayerRole.POINTEUR, PlayerRole.MILIEU]),
         Player(id=12, name="PM3", roles=[PlayerRole.POINTEUR, PlayerRole.MILIEU]),
