@@ -2,7 +2,7 @@
 
 A production-quality **Streamlit** application for managing pétanque tournaments with intelligent scheduling, live rankings, and constraint satisfaction algorithms.
 
-[![CI](https://github.com/yourusername/petanque_manager/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/petanque_manager/actions/workflows/ci.yml)
+[![CI](https://github.com/geremyjiral/petanque_manager/actions/workflows/ci.yml/badge.svg)](https://github.com/geremyjiral/petanque_manager/actions/workflows/ci.yml)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](http://mypy-lang.org/)
@@ -64,7 +64,7 @@ A production-quality **Streamlit** application for managing pétanque tournament
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/petanque_manager.git
+git clone https://github.com/geremyjiral/petanque_manager.git
 cd petanque_manager
 ```
 
@@ -201,7 +201,7 @@ Configure via the web UI (requires admin login):
 git init
 git add .
 git commit -m "Initial commit"
-git remote add origin https://github.com/yourusername/petanque_manager.git
+git remote add origin https://github.com/geremyjiral/petanque_manager.git
 git push -u origin main
 ```
 
@@ -423,7 +423,7 @@ This project is licensed under the MIT License. See LICENSE file for details.
 ## 📧 Support
 
 For issues, questions, or suggestions:
-- Open an issue on [GitHub](https://github.com/yourusername/petanque_manager/issues)
+- Open an issue on [GitHub](https://github.com/geremyjiral/petanque_manager/issues)
 - Check the [troubleshooting section](#-troubleshooting)
 
 ---

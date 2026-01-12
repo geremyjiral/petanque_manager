@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/petanque_manager.git
+git clone https://github.com/geremyjiral/petanque_manager.git
 cd petanque_manager
 ```
 
