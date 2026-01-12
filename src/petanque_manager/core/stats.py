@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 
-from src.petanque_manager.core.models import Match, Player, PlayerStats, TournamentMode
+from src.petanque_manager.core.models import Match, MatchFormat, Player, PlayerStats, TournamentMode
 
 
 def calculate_player_stats(
@@ -284,3 +284,26 @@ def get_tournament_summary(
         "triplette_matches": triplette_count,
         "doublette_matches": doublette_count,
     }
+
+
+def count_rencontres_bancales(matches: list[Match]) -> int:
+    """Count 'rencontres bancales' (unbalanced/fallback matches).
+
+    A 'rencontre bancale' is defined as:
+    - Hybrid (3v2) match (always unbalanced)
+
+    Args:
+        matches: List of all matches
+        tournament_mode: Current tournament mode
+
+    Returns:
+        Count of unbalanced/fallback matches
+    """
+    bancales_count = 0
+
+    for match in matches:
+        # Hybrid matches are always bancales (unbalanced by definition)
+        if match.format == MatchFormat.HYBRID:
+            bancales_count += 1
+
+    return bancales_count

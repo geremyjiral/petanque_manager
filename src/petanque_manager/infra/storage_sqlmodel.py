@@ -12,6 +12,7 @@ from src.petanque_manager.core.models import (
     Player,
     PlayerRole,
     Round,
+    ScheduleQualityReport,
     StorageBackend,
     TournamentConfig,
     TournamentMode,
@@ -58,6 +59,7 @@ class RoundDB(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     index: int = Field(unique=True, index=True)
+    quality_report: str | None = None  # Store ScheduleQualityReport as JSON string
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -248,9 +250,14 @@ class SQLModelStorage(TournamentStorage):
             if existing:
                 raise ValueError(f"Round with index {round_obj.index} already exists")
 
+            quality_report_json = None
+            if round_obj.quality_report is not None:
+                quality_report_json = round_obj.quality_report.model_dump_json()
+
             # Create round
             round_db = RoundDB(
                 index=round_obj.index,
+                quality_report=quality_report_json,
                 created_at=round_obj.created_at,
             )
             session.add(round_db)
@@ -289,10 +296,15 @@ class SQLModelStorage(TournamentStorage):
                     )
                 )
 
+            quality_report = None
+            if round_db.quality_report:
+                quality_report = ScheduleQualityReport.model_validate_json(round_db.quality_report)
+
             return Round(
                 id=round_db.id,
                 index=round_db.index,
                 matches=matches,
+                quality_report=quality_report,
                 created_at=round_db.created_at,
             )
 
@@ -321,10 +333,15 @@ class SQLModelStorage(TournamentStorage):
                 for m in matches_db
             ]
 
+            quality_report = None
+            if round_db.quality_report:
+                quality_report = ScheduleQualityReport.model_validate_json(round_db.quality_report)
+
             return Round(
                 id=round_db.id,
                 index=round_db.index,
                 matches=matches,
+                quality_report=quality_report,
                 created_at=round_db.created_at,
             )
 

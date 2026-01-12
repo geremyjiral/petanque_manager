@@ -158,6 +158,7 @@ class Round(BaseModel):
     id: int | None = None
     index: int = Field(..., ge=0)
     matches: list["Match"] = []
+    quality_report: "ScheduleQualityReport | None" = None
     created_at: datetime = Field(default_factory=datetime.now)
 
     @property
@@ -229,13 +230,13 @@ class ScheduleQualityReport(BaseModel):
         """Return a letter grade for schedule quality."""
         if self.total_score == 0:
             return "A+"
-        elif self.total_score < 10:
+        elif self.total_score < 20:
             return "A"
-        elif self.total_score < 25:
-            return "B"
         elif self.total_score < 50:
-            return "C"
+            return "B"
         elif self.total_score < 100:
+            return "C"
+        elif self.total_score < 300:
             return "D"
         else:
             return "F"

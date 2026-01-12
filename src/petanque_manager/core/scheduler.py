@@ -9,6 +9,7 @@ This module implements the round generation logic with soft constraints:
 
 import random
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from src.petanque_manager.core.models import (
@@ -225,54 +226,20 @@ def calculate_role_requirements(mode: TournamentMode, player_count: int) -> Role
     total_triplette_teams = triplette_teams + nb_3v2  # Hybrid contributes 1 triplette team
     total_doublette_teams = doublette_teams + nb_3v2  # Hybrid contributes 1 doublette team
 
-    # Calculate role needs based on teams
-    # With multiple roles, we count how many players should be ABLE to play each role
-    if mode == TournamentMode.TRIPLETTE:
-        # Each triplette team needs: 1 TIREUR, 1 POINTEUR, 1 MILIEU
-        tireur_needed = total_triplette_teams
-        pointeur_needed = total_triplette_teams
-        milieu_needed = total_triplette_teams
+    tireur_needed = total_doublette_teams + total_triplette_teams
+    pointeur_needed = total_doublette_teams + total_triplette_teams
+    milieu_needed = total_triplette_teams
 
-        # Each doublette team needs: 1 TIREUR, 1 (POINTEUR or MILIEU)
-        tireur_needed += total_doublette_teams
-        # For doublettes: ideally split between pointeur and milieu
-        # Add to both counters (players can have multiple roles)
-        pointeur_needed += total_doublette_teams // 2 + total_doublette_teams % 2
-        milieu_needed += total_doublette_teams // 2
-
-        return RoleRequirements(
-            mode=mode,
-            total_players=player_count,
-            tireur_needed=tireur_needed,
-            pointeur_needed=pointeur_needed,
-            milieu_needed=milieu_needed,
-            triplette_count=nb_3v3,
-            doublette_count=nb_2v2,
-            hybrid_count=nb_3v2,
-        )
-    else:  # DOUBLETTE mode
-        # Each doublette team needs: 1 TIREUR, 1 (POINTEUR or MILIEU)
-        tireur_needed = total_doublette_teams
-        # For doublettes: split between pointeur and milieu
-        pointeur_needed = total_doublette_teams // 2 + total_doublette_teams % 2
-        milieu_needed = total_doublette_teams // 2
-
-        # Each triplette team needs: 1 TIREUR, 2 (POINTEUR or MILIEU)
-        tireur_needed += total_triplette_teams
-        # For triplettes in doublette mode: need more pointeur/milieu
-        pointeur_needed += total_triplette_teams
-        milieu_needed += total_triplette_teams
-
-        return RoleRequirements(
-            mode=mode,
-            total_players=player_count,
-            tireur_needed=tireur_needed,
-            pointeur_needed=pointeur_needed,
-            milieu_needed=milieu_needed,
-            triplette_count=nb_3v3,
-            doublette_count=nb_2v2,
-            hybrid_count=nb_3v2,
-        )
+    return RoleRequirements(
+        mode=mode,
+        total_players=player_count,
+        tireur_needed=tireur_needed,
+        pointeur_needed=pointeur_needed,
+        milieu_needed=milieu_needed,
+        triplette_count=nb_3v3,
+        doublette_count=nb_2v2,
+        hybrid_count=nb_3v2,
+    )
 
 
 def validate_team_roles(
@@ -354,13 +321,18 @@ class TournamentScheduler:
         players: list[Player],
         round_index: int,
         previous_rounds: list[Round],
+        attempts: int = 500,
+        progress_callback: Callable[[int, int, float], None] | None = None,
     ) -> tuple[Round, ScheduleQualityReport]:
         """Generate a single round with matches.
+
 
         Args:
             players: List of active players
             round_index: Index of this round (0-based)
             previous_rounds: Previously generated rounds
+            attempts: Number of shuffles to try (default: 100, balanced for quality/performance)
+            progress_callback: Optional callback(attempt, total_attempts, best_score) for progress updates
 
         Returns:
             Tuple of (generated round, quality report)
@@ -381,6 +353,18 @@ class TournamentScheduler:
         if player_count < 4:
             raise ValueError("Need at least 4 players to generate matches")
 
+        players_by_role: dict[PlayerRole, list[Player]] = {
+            PlayerRole.TIREUR: [],
+            PlayerRole.POINTEUR: [],
+            PlayerRole.MILIEU: [],
+        }
+        for player in players:
+            for role in player.roles:
+                players_by_role[role].append(player)
+
+        # Store in instance for use in _form_team
+        self._players_by_role = players_by_role
+
         # Shuffle players for variety
         shuffled_players = players.copy()
         random.shuffle(shuffled_players)
@@ -388,22 +372,39 @@ class TournamentScheduler:
         # Try multiple times to find best schedule
         best_matches: list[Match] | None = None
         best_score = float("inf")
-        attempts = 50  # Try 50 different arrangements
+
+        good_enough_threshold = 10.0
+        min_attempts_before_early_stop = 30  # Minimum attempts before considering early stop
 
         for attempt in range(attempts):
             if attempt > 0:
                 random.shuffle(shuffled_players)
 
+            temp_tracker = ConstraintTracker()
+            # Copy previous rounds' constraints
+            for prev_round in previous_rounds:
+                for match in prev_round.matches:
+                    temp_tracker.add_match(match, self.mode)
+
             try:
-                matches = self._generate_matches_for_round(shuffled_players, round_index)
-                score = self._score_matches(matches)
+                matches = self._generate_matches_for_round(
+                    shuffled_players, round_index, temp_tracker
+                )
+                score = self._score_matches_with_tracker(matches, temp_tracker)
 
                 if score < best_score:
                     best_score = score
                     best_matches = matches
 
-                # If we found a perfect score, stop
+                    # Call progress callback if provided
+                    if progress_callback is not None:
+                        progress_callback(attempt + 1, attempts, best_score)
+
                 if score == 0:
+                    # Perfect score (A+) - no need to continue
+                    break
+                if score < good_enough_threshold and attempt >= min_attempts_before_early_stop:
+                    # Grade A score after sufficient attempts - good enough
                     break
             except ValueError:
                 # This arrangement didn't work, try another
@@ -415,13 +416,14 @@ class TournamentScheduler:
         # Generate quality report
         quality_report = self._generate_quality_report(best_matches)
 
-        round_obj = Round(index=round_index, matches=best_matches)
+        round_obj = Round(index=round_index, matches=best_matches, quality_report=quality_report)
         return round_obj, quality_report
 
     def _generate_matches_for_round(
         self,
         players: list[Player],
         round_index: int,
+        tracker: ConstraintTracker,
     ) -> list[Match]:
         """Generate matches for a round using optimal distribution.
 
@@ -431,6 +433,7 @@ class TournamentScheduler:
         Args:
             players: List of players
             round_index: Round index
+            tracker: Constraint tracker to update as matches are created
 
         Returns:
             List of matches
@@ -475,6 +478,7 @@ class TournamentScheduler:
                 team_b_player_ids=[p.id for p in team_b if p.id is not None],
             )
             matches.append(match)
+            tracker.add_match(match, self.mode)
             terrain_index += 1
 
         # Generate 2v2 matches
@@ -506,6 +510,7 @@ class TournamentScheduler:
                 team_b_player_ids=[p.id for p in team_b if p.id is not None],
             )
             matches.append(match)
+            tracker.add_match(match, self.mode)
             terrain_index += 1
 
         # Generate 3v2 hybrid matches
@@ -539,10 +544,22 @@ class TournamentScheduler:
                 team_b_player_ids=[p.id for p in team_2 if p.id is not None],
             )
             matches.append(match)
+            tracker.add_match(match, self.mode)
             terrain_index += 1
 
         if not matches:
             raise ValueError("Could not generate any matches")
+
+        expected_matches = nb_3v3 + nb_2v2 + nb_3v2
+        if len(matches) != expected_matches:
+            # Log details for debugging
+            actual_players_used = sum(len(m.all_player_ids) for m in matches)
+            raise ValueError(
+                f"Match generation error: Expected {expected_matches} matches "
+                f"(3v3={nb_3v3}, 2v2={nb_2v2}, 3v2={nb_3v2}) but generated {len(matches)}. "
+                f"Players: {len(players)} total, {actual_players_used} used in matches. "
+                f"This may indicate insufficient players with required roles or a logic error."
+            )
 
         return matches
 
@@ -585,27 +602,50 @@ class TournamentScheduler:
                 # TRIPLETTE mode with doublette fallback: 1 TIREUR + 1 (POINTEUR or MILIEU)
                 needed_roles = [PlayerRole.TIREUR, [PlayerRole.POINTEUR, PlayerRole.MILIEU]]
 
-        # Try to find players matching needed roles
+        available_ids = {p.id for p in available_players if p.id is not None}
         team: list[Player] = []
-        remaining_players = available_players.copy()
+        used_ids: set[int] = set()  # Track used player IDs to avoid duplicates
 
         for needed_role in needed_roles:
+            player = None
+
             # Handle both single role and list of alternative roles
             if isinstance(needed_role, list):
-                # Find a player with any of the roles in the list
-                player = next(
-                    (p for p in remaining_players if any(role in p.roles for role in needed_role)),
-                    None,
-                )
+                # Try each role in priority order
+                for role in needed_role:
+                    candidates = self._players_by_role.get(role, []).copy()
+                    random.shuffle(candidates)
+
+                    for candidate in candidates:
+                        if (
+                            candidate.id is not None
+                            and candidate.id in available_ids
+                            and candidate.id not in used_ids
+                        ):
+                            player = candidate
+                            break
+                    if player is not None:
+                        break
             else:
-                # Find a player with the specific role
-                player = next((p for p in remaining_players if needed_role in p.roles), None)
+                # Single specific role
+                candidates = self._players_by_role.get(needed_role, []).copy()
+                random.shuffle(candidates)
+
+                for candidate in candidates:
+                    if (
+                        candidate.id is not None
+                        and candidate.id in available_ids
+                        and candidate.id not in used_ids
+                    ):
+                        player = candidate
+                        break
 
             if player is None:
                 return None
 
             team.append(player)
-            remaining_players.remove(player)
+            if player.id is not None:
+                used_ids.add(player.id)
 
         return team if len(team) == team_size else None
 
@@ -618,9 +658,23 @@ class TournamentScheduler:
         Returns:
             Total penalty score (lower is better)
         """
+        return self._score_matches_with_tracker(matches, self.tracker)
+
+    def _score_matches_with_tracker(
+        self, matches: list[Match], tracker: ConstraintTracker
+    ) -> float:
+        """Score a set of matches using a specific tracker.
+
+        Args:
+            matches: List of matches to score
+            tracker: Constraint tracker to use for scoring
+
+        Returns:
+            Total penalty score (lower is better)
+        """
         total_score = 0.0
         for match in matches:
-            score = self.tracker.score_match(
+            score = tracker.score_match(
                 match.team_a_player_ids,
                 match.team_b_player_ids,
                 match.terrain_label,

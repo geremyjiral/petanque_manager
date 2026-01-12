@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from Acceuil import get_storage
-from src.petanque_manager.core.stats import get_tournament_summary
+from src.petanque_manager.core.stats import count_rencontres_bancales, get_tournament_summary
 from src.petanque_manager.infra.auth import show_login_form
 
 
@@ -74,6 +74,36 @@ def main() -> None:
             summary["doublette_matches"],
             help="Matchs en 2 contre 2",
         )
+
+    bancales_count = count_rencontres_bancales(all_matches)
+    if bancales_count > 0 and config:
+        st.markdown("---")
+        st.subheader("⚠️ Rencontres bancales (format alternatif)")
+        st.metric(
+            "Matchs en format alternatif",
+            bancales_count,
+            help=(
+                "Matchs joués dans un format non prioritaire pour équilibrer le nombre de joueurs. "
+                f"Mode du tournoi : {config.mode.value}. "
+                "Inclut : doublettes en mode triplette, triplettes en mode doublette, et matchs hybrides (3v2)."
+            ),
+        )
+
+        if all_rounds:
+            with st.expander("📊 Détail par manche"):
+                round_bancales: list[dict[str, int]] = []
+                for round_obj in all_rounds:
+                    round_bancales_count = count_rencontres_bancales(round_obj.matches)
+                    round_bancales.append(
+                        {
+                            "Manche": round_obj.index + 1,
+                            "Matchs bancals": round_bancales_count,
+                            "Total matchs": len(round_obj.matches),
+                        }
+                    )
+
+                df_bancales = pd.DataFrame(round_bancales)
+                st.dataframe(df_bancales, width="stretch", hide_index=True)  # pyright: ignore[reportUnknownMemberType]
 
     # Statistiques manche par manche
     if all_rounds:

@@ -25,13 +25,15 @@ def main() -> None:
         st.warning("⚠️ Veuillez d’abord configurer le tournoi sur la page d’accueil.")
         st.stop()
 
-    # Données
     rounds = storage.get_all_rounds()
     all_matches = storage.get_all_matches()
 
+    all_players = storage.get_all_players(active_only=False)
+    players_by_id: dict[int, Player] = {p.id: p for p in all_players if p.id is not None}
+
     if not rounds:
         st.info(
-            "📅 Aucune manche générée pour le moment. Générez d’abord les manches sur la page Planning."
+            "📅 Aucune manche générée pour le moment. Générez d'abord les manches sur la page Planning."
         )
         st.stop()
 
@@ -69,18 +71,16 @@ def main() -> None:
             # Afficher les matchs de la manche
             for match in round_obj.matches:
                 with st.container(border=True):
-                    team_a_players: list[Player] = []
-                    team_b_players: list[Player] = []
-
-                    for pid in match.team_a_player_ids:
-                        player = storage.get_player(pid)
-                        if player:
-                            team_a_players.append(player)
-
-                    for pid in match.team_b_player_ids:
-                        player = storage.get_player(pid)
-                        if player:
-                            team_b_players.append(player)
+                    team_a_players: list[Player] = [
+                        players_by_id[pid]
+                        for pid in match.team_a_player_ids
+                        if pid in players_by_id
+                    ]
+                    team_b_players: list[Player] = [
+                        players_by_id[pid]
+                        for pid in match.team_b_player_ids
+                        if pid in players_by_id
+                    ]
 
                     team_a_display = " + ".join(
                         [
@@ -151,10 +151,10 @@ def main() -> None:
                                     match.score_a = int(score_a)
                                     match.score_b = int(score_b)
                                     storage.update_match(match)
-                                    st.success("✅ Score enregistré !")
+                                    st.toast("✅ Score enregistré !", icon="✅")
                                     st.rerun()
                                 except Exception as e:
-                                    st.error(f"❌ Erreur lors de l’enregistrement : {e}")
+                                    st.error(f"❌ Erreur lors de l'enregistrement : {e}")
 
                         with col_clear:
                             if match.is_complete and st.button(

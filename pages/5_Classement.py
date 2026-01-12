@@ -1,5 +1,6 @@
 """Page de classement affichant le classement des joueurs."""
 
+import io
 from typing import Any
 
 import pandas as pd
@@ -177,15 +178,48 @@ def main() -> None:
         )
 
         # Export
-        if st.button("📥 Exporter le classement en CSV"):
-            csv = df_ranking.to_csv(index=False).encode("utf-8")
+        export_col1, export_col2 = st.columns(2)
 
-            st.download_button(
-                label="Télécharger le CSV",
-                data=csv,
-                file_name="classement_tournoi.csv",
-                mime="text/csv",
-            )
+        with export_col1:
+            if st.button("📥 Exporter le classement en CSV"):
+                csv = df_ranking.to_csv(index=False).encode("utf-8")
+
+                st.download_button(
+                    label="Télécharger le CSV",
+                    data=csv,
+                    file_name="classement_tournoi.csv",
+                    mime="text/csv",
+                )
+
+        with export_col2:
+            if st.button("📊 Exporter le classement en Excel"):
+                # Create Excel file with formatted rankings
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                    df_ranking.to_excel(writer, index=False, sheet_name="Classement")  # pyright: ignore[reportUnknownMemberType]
+
+                    # Auto-adjust column widths
+                    worksheet = writer.sheets["Classement"]
+                    for column in worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except Exception:
+                                pass
+                        adjusted_width = min(max_length + 2, 40)
+                        worksheet.column_dimensions[column_letter].width = adjusted_width
+
+                excel_buffer.seek(0)
+
+                st.download_button(
+                    label="📊 Télécharger le classement (Excel)",
+                    data=excel_buffer,
+                    file_name="classement_tournoi.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
 
     # Tops
     st.header("🌟 Meilleures performances")

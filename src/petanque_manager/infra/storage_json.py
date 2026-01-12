@@ -10,6 +10,7 @@ from src.petanque_manager.core.models import (
     Player,
     PlayerRole,
     Round,
+    ScheduleQualityReport,
     StorageBackend,
     TournamentConfig,
     TournamentMode,
@@ -234,10 +235,15 @@ class JSONStorage(TournamentStorage):
             }
             matches_data.append(match_data)
 
+        quality_report_data = None
+        if round_obj.quality_report is not None:
+            quality_report_data = round_obj.quality_report.model_dump()
+
         round_data: dict[str, Any] = {
             "id": round_id,
             "index": round_obj.index,
             "matches": matches_data,
+            "quality_report": quality_report_data,
             "created_at": round_obj.created_at.isoformat(),
         }
 
@@ -264,6 +270,7 @@ class JSONStorage(TournamentStorage):
             id=round_id,
             index=round_obj.index,
             matches=matches,
+            quality_report=round_obj.quality_report,
             created_at=round_obj.created_at,
         )
 
@@ -286,10 +293,15 @@ class JSONStorage(TournamentStorage):
                     for m in r["matches"]
                 ]
 
+                quality_report = None
+                if r.get("quality_report"):
+                    quality_report = ScheduleQualityReport(**r["quality_report"])
+
                 return Round(
                     id=r["id"],
                     index=r["index"],
                     matches=matches,
+                    quality_report=quality_report,
                     created_at=r["created_at"],
                 )
         return None

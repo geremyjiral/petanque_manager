@@ -1,4 +1,6 @@
-"""Page de génération et d’affichage du planning."""
+"""Page de génération et d'affichage du planning."""
+
+import io
 
 import pandas as pd
 import streamlit as st
@@ -30,9 +32,14 @@ def main() -> None:
 
     can_edit = is_authenticated()
 
-    # Données
     players = storage.get_all_players(active_only=True)
     rounds = storage.get_all_rounds()
+
+    # This prevents repeated database queries when displaying matches
+    all_players = storage.get_all_players(
+        active_only=False
+    )  # Include inactive for historical matches
+    players_by_id: dict[int, Player] = {p.id: p for p in all_players if p.id is not None}
 
     # Résumé
     col1, col2, col3 = st.columns(3)
@@ -61,11 +68,45 @@ def main() -> None:
                 else "✅ Toutes les manches sont générées",
                 expanded=len(rounds) < config.rounds_count,
             ):
+                if rounds:
+                    st.markdown("**📊 Qualité des manches générées**")
+
+                    quality_data: list[dict[str, str | int | float]] = []
+                    for r in rounds:
+                        if r.quality_report:
+                            quality_data.append(
+                                {
+                                    "Manche": r.index + 1,
+                                    "Note": r.quality_report.quality_grade,
+                                    "Score": f"{r.quality_report.total_score:.1f}",
+                                    "Partenaires répétés": r.quality_report.repeated_partners,
+                                    "Adversaires répétés": r.quality_report.repeated_opponents,
+                                    "Format alternatif": r.quality_report.fallback_format_count,
+                                }
+                            )
+
+                    if quality_data:
+                        df_quality = pd.DataFrame(quality_data)
+                        st.dataframe(df_quality, width="stretch", hide_index=True)  # pyright: ignore[reportUnknownMemberType]
+
+                        # Average quality
+                        avg_score = sum(
+                            r.quality_report.total_score for r in rounds if r.quality_report
+                        ) / len([r for r in rounds if r.quality_report])
+                        st.caption(f"💡 Score moyen : {avg_score:.1f}")
+                    else:
+                        st.info(
+                            "Les manches existantes n'ont pas de rapport de qualité. "
+                            "Les nouvelles manches générées incluront automatiquement cette information."
+                        )
+
+                    st.markdown("---")
+
                 if len(rounds) >= config.rounds_count:
                     st.success("✅ Toutes les manches ont été générées !")
                     st.info(
                         "Pour générer plus de manches, augmentez le champ "
-                        "« Nombre de manches » dans la configuration sur la page d’accueil."
+                        "« Nombre de manches » dans la configuration sur la page d'accueil."
                     )
                 else:
                     next_round_index = len(rounds)
@@ -98,23 +139,45 @@ def main() -> None:
 
                     if st.button("🎲 Générer la manche", type="primary"):
                         try:
-                            with st.spinner("Génération de la manche…"):
-                                scheduler = TournamentScheduler(
-                                    mode=config.mode,
-                                    terrains_count=config.terrains_count,
-                                    seed=custom_seed if custom_seed else config.seed,
+                            # Create placeholders for progress feedback
+                            progress_bar = st.progress(0)
+                            status_text = st.empty()
+
+                            def progress_callback(
+                                attempt: int, total: int, best_score: float
+                            ) -> None:
+                                """Update progress UI during generation."""
+                                progress = attempt / total
+                                progress_bar.progress(progress)
+                                status_text.text(
+                                    f"🔄 Recherche de la meilleure combinaison... "
+                                    f"(tentative {attempt}/{total}, score: {best_score:.0f})"
                                 )
 
-                                round_obj, quality_report = scheduler.generate_round(
-                                    players=players,
-                                    round_index=next_round_index,
-                                    previous_rounds=rounds,
-                                )
-                                st.session_state["quality_report"] = quality_report
-                                # Sauvegarde
-                                storage.add_round(round_obj)
+                            status_text.text("🔄 Initialisation de la génération...")
 
-                                st.rerun()
+                            scheduler = TournamentScheduler(
+                                mode=config.mode,
+                                terrains_count=config.terrains_count,
+                                seed=custom_seed if custom_seed else config.seed,
+                            )
+
+                            round_obj, quality_report = scheduler.generate_round(
+                                players=players,
+                                round_index=next_round_index,
+                                previous_rounds=rounds,
+                                progress_callback=progress_callback,
+                            )
+                            st.session_state["quality_report"] = quality_report
+
+                            # Clear progress indicators
+                            progress_bar.empty()
+                            status_text.empty()
+
+                            # Sauvegarde
+                            storage.add_round(round_obj)
+
+                            st.rerun()
 
                         except ValueError as e:
                             st.error(f"❌ Erreur lors de la génération : {e}")
@@ -216,23 +279,67 @@ def main() -> None:
                             storage.delete_round(round_obj.id)
                             st.rerun()
 
+                # FEATURE: Display quality report for this round (now persisted)
+                if round_obj.quality_report:
+                    st.subheader("📊 Rapport de qualité")
+
+                    (
+                        qr_col1,
+                        qr_col2,
+                        qr_col3,
+                        qr_col4,
+                        qr_col5,
+                    ) = st.columns(5)
+
+                    with qr_col1:
+                        st.metric("Note", round_obj.quality_report.quality_grade)
+
+                    with qr_col2:
+                        st.metric(
+                            "Partenaires répétés",
+                            round_obj.quality_report.repeated_partners,
+                            help="Paires de joueurs jouant ensemble plus d'une fois",
+                        )
+
+                    with qr_col3:
+                        st.metric(
+                            "Adversaires répétés",
+                            round_obj.quality_report.repeated_opponents,
+                            help="Paires de joueurs s'affrontant plus d'une fois",
+                        )
+
+                    with qr_col4:
+                        st.metric(
+                            "Terrains répétés",
+                            round_obj.quality_report.repeated_terrains,
+                            help="Joueurs jouant sur le même terrain plus d'une fois",
+                        )
+
+                    with qr_col5:
+                        st.metric(
+                            "Matchs en format alternatif",
+                            round_obj.quality_report.fallback_format_count,
+                            help="Matchs joués dans le format non prioritaire",
+                        )
+
+                    st.caption(f"Score total: {round_obj.quality_report.total_score:.1f}")
+
                 # Liste des matchs
                 st.subheader("🎯 Liste des matchs")
 
                 for match in round_obj.matches:
                     with st.container(border=True):
-                        team_a_players: list[Player] = []
-                        team_b_players: list[Player] = []
-
-                        for pid in match.team_a_player_ids:
-                            player = storage.get_player(pid)
-                            if player:
-                                team_a_players.append(player)
-
-                        for pid in match.team_b_player_ids:
-                            player = storage.get_player(pid)
-                            if player:
-                                team_b_players.append(player)
+                        # OPTIMIZATION: Use pre-loaded player dictionary instead of database queries
+                        team_a_players: list[Player] = [
+                            players_by_id[pid]
+                            for pid in match.team_a_player_ids
+                            if pid in players_by_id
+                        ]
+                        team_b_players: list[Player] = [
+                            players_by_id[pid]
+                            for pid in match.team_b_player_ids
+                            if pid in players_by_id
+                        ]
 
                         team_a_display = " + ".join(
                             [
@@ -276,18 +383,17 @@ def main() -> None:
                     match_data: list[dict[str, str | int]] = []
 
                     for match in round_obj.matches:
-                        team_a_names: list[str] = []
-                        team_b_names: list[str] = []
-
-                        for pid in match.team_a_player_ids:
-                            player = storage.get_player(pid)
-                            if player:
-                                team_a_names.append(player.name)
-
-                        for pid in match.team_b_player_ids:
-                            player = storage.get_player(pid)
-                            if player:
-                                team_b_names.append(player.name)
+                        # OPTIMIZATION: Use pre-loaded player dictionary
+                        team_a_names: list[str] = [
+                            players_by_id[pid].name
+                            for pid in match.team_a_player_ids
+                            if pid in players_by_id
+                        ]
+                        team_b_names: list[str] = [
+                            players_by_id[pid].name
+                            for pid in match.team_b_player_ids
+                            if pid in players_by_id
+                        ]
 
                         match_data.append(
                             {
@@ -310,6 +416,84 @@ def main() -> None:
                         file_name=f"manche_{round_obj.index + 1}.csv",
                         mime="text/csv",
                     )
+
+        st.markdown("---")
+        st.subheader("📊 Export complet du programme")
+
+        if st.button("📥 Exporter tout le programme en Excel", type="primary"):
+            # Prepare data for all matches across all rounds
+            full_schedule_data: list[dict[str, str | int | None]] = []
+
+            for round_obj in rounds:
+                for match in round_obj.matches:
+                    team_a_players_export: list[str] = [
+                        players_by_id[pid].name
+                        for pid in match.team_a_player_ids
+                        if pid in players_by_id
+                    ]
+                    team_b_players_export: list[str] = [
+                        players_by_id[pid].name
+                        for pid in match.team_b_player_ids
+                        if pid in players_by_id
+                    ]
+
+                    # Pad teams to 3 players with None
+                    while len(team_a_players_export) < 3:
+                        team_a_players_export.append("")
+                    while len(team_b_players_export) < 3:
+                        team_b_players_export.append("")
+
+                    full_schedule_data.append(
+                        {
+                            "Manche": round_obj.index + 1,
+                            "Terrain": match.terrain_label,
+                            "Équipe A - Joueur 1": team_a_players_export[0],
+                            "Équipe A - Joueur 2": team_a_players_export[1],
+                            "Équipe A - Joueur 3": team_a_players_export[2]
+                            if len(team_a_players_export) > 2
+                            else "",
+                            "Score A": match.score_a if match.score_a is not None else "",
+                            "Score B": match.score_b if match.score_b is not None else "",
+                            "Équipe B - Joueur 1": team_b_players_export[0],
+                            "Équipe B - Joueur 2": team_b_players_export[1],
+                            "Équipe B - Joueur 3": team_b_players_export[2]
+                            if len(team_b_players_export) > 2
+                            else "",
+                        }
+                    )
+
+            # Create DataFrame and export to Excel
+            df_full = pd.DataFrame(full_schedule_data)
+
+            # Use BytesIO to create Excel file in memory
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+                df_full.to_excel(writer, index=False, sheet_name="Programme complet")  # pyright: ignore[reportUnknownMemberType]
+
+                # Auto-adjust column widths for readability
+                worksheet = writer.sheets["Programme complet"]
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except Exception:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+
+            excel_buffer.seek(0)
+
+            st.download_button(
+                label="📥 Télécharger le programme complet (Excel)",
+                data=excel_buffer,
+                file_name="programme_complet_petanque.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+            st.success(f"✅ Programme complet prêt ({len(full_schedule_data)} matchs)")
 
     # Suppression des manches
     if can_edit and rounds:
