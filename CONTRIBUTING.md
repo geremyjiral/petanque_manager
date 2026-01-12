@@ -6,8 +6,8 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/petanque-papa.git
-cd petanque-papa
+git clone https://github.com/yourusername/petanque_manager.git
+cd petanque_manager
 ```
 
 2. **Install dependencies**
