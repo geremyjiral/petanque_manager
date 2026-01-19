@@ -7,7 +7,7 @@ import streamlit as st
 
 from Acceuil import get_storage
 from src.petanque_manager.core.models import Player, ScheduleQualityReport
-from src.petanque_manager.core.scheduler import TournamentScheduler
+from src.petanque_manager.core.scheduler import ConfigScoringMatchs, TournamentScheduler
 from src.petanque_manager.infra.auth import is_authenticated, show_login_form
 
 
@@ -70,7 +70,19 @@ def main() -> None:
             ):
                 if rounds:
                     st.markdown("**📊 Qualité des manches générées**")
-
+                    st.markdown(f"""Voici la méthode du calcul de la qualité utilisée :
+                                - En cas de partenaires répétés : pénalité de {ConfigScoringMatchs.repeated_partners_penalty} points par paire
+                                - En cas d'adversaires répétés : pénalité de {ConfigScoringMatchs.repeated_opponents_penalty} points par paire
+                                - En cas de terrains répétés : pénalité de {ConfigScoringMatchs.repeated_terrains_penalty} points par joueur
+                                - En cas de format alternatif : pénalité de {ConfigScoringMatchs.fallback_format_penalty_per_player} points par joueur
+                                - Note finale basée sur le score total :
+                                    - A+ : 0 points
+                                    - A  : 0-20 points
+                                    - B  : 21-50 points
+                                    - C  : 51-100 points
+                                    - D  : 101-300 points
+                                    - E  : >300 points
+                                """)
                     quality_data: list[dict[str, str | int | float]] = []
                     for r in rounds:
                         if r.quality_report:

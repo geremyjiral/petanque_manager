@@ -26,6 +26,15 @@ from src.petanque_manager.utils.seed import set_random_seed
 from src.petanque_manager.utils.terrain_labels import get_terrain_label
 
 
+class ConfigScoringMatchs:
+    """Configuration for scoring matches."""
+
+    repeated_partners_penalty: float = 10.0
+    repeated_opponents_penalty: float = 5.0
+    repeated_terrains_penalty: float = 2.0
+    fallback_format_penalty_per_player: float = 4.0
+
+
 @dataclass
 class ConstraintTracker:
     """Tracks constraint violations across rounds."""
@@ -115,23 +124,23 @@ class ConstraintTracker:
         for pid in team_a:
             for other in team_a:
                 if pid != other and other in self.partners[pid]:
-                    score += 10.0
+                    score += ConfigScoringMatchs.repeated_partners_penalty
 
         for pid in team_b:
             for other in team_b:
                 if pid != other and other in self.partners[pid]:
-                    score += 10.0
+                    score += ConfigScoringMatchs.repeated_partners_penalty
 
         # Check repeated opponents (medium penalty: 5 points per violation)
         for pid_a in team_a:
             for pid_b in team_b:
                 if pid_b in self.opponents[pid_a]:
-                    score += 5.0
+                    score += ConfigScoringMatchs.repeated_opponents_penalty
 
         # Check repeated terrains (medium penalty: 2 points per violation)
         for pid in team_a + team_b:
             if terrain in self.terrains[pid]:
-                score += 2.0
+                score += ConfigScoringMatchs.repeated_terrains_penalty
 
         # Check fallback format (medium penalty: 4 points per player)
         is_fallback = (
@@ -139,7 +148,7 @@ class ConstraintTracker:
         ) or (tournament_mode == TournamentMode.DOUBLETTE and match_format == MatchFormat.TRIPLETTE)
 
         if is_fallback:
-            score += 4.0 * len(team_a + team_b)
+            score += ConfigScoringMatchs.fallback_format_penalty_per_player * len(team_a + team_b)
 
         return score
 

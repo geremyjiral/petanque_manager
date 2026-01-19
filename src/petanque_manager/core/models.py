@@ -239,7 +239,7 @@ class ScheduleQualityReport(BaseModel):
         elif self.total_score < 300:
             return "D"
         else:
-            return "F"
+            return "E"
 
 
 class RoleRequirements(BaseModel):
