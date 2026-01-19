@@ -175,13 +175,14 @@ def main() -> None:
                                 seed=custom_seed if custom_seed else config.seed,
                             )
 
-                            round_obj, quality_report = scheduler.generate_round(
+                            round_obj, quality_report, attempts = scheduler.generate_round(
                                 players=players,
                                 round_index=next_round_index,
                                 previous_rounds=rounds,
                                 progress_callback=progress_callback,
                             )
                             st.session_state["quality_report"] = quality_report
+                            st.session_state["generation_attempts"] = attempts
 
                             # Clear progress indicators
                             progress_bar.empty()
@@ -194,6 +195,9 @@ def main() -> None:
 
                         except ValueError as e:
                             st.error(f"❌ Erreur lors de la génération : {e}")
+                    if "generation_attempts" in st.session_state:
+                        attempts_prev: int = st.session_state["generation_attempts"]
+                        st.info(f"ℹ️ Dernière génération a pris {attempts_prev} tentatives.")
                     if "quality_report" in st.session_state:
                         quality_report_prev: ScheduleQualityReport = st.session_state[
                             "quality_report"

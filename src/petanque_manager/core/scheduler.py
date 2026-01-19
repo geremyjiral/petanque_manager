@@ -332,7 +332,7 @@ class TournamentScheduler:
         previous_rounds: list[Round],
         attempts: int = 500,
         progress_callback: Callable[[int, int, float], None] | None = None,
-    ) -> tuple[Round, ScheduleQualityReport]:
+    ) -> tuple[Round, ScheduleQualityReport, int]:
         """Generate a single round with matches.
 
 
@@ -384,7 +384,7 @@ class TournamentScheduler:
 
         good_enough_threshold = 10.0
         min_attempts_before_early_stop = 30  # Minimum attempts before considering early stop
-
+        attempt = 0
         for attempt in range(attempts):
             if attempt > 0:
                 random.shuffle(shuffled_players)
@@ -426,7 +426,7 @@ class TournamentScheduler:
         quality_report = self._generate_quality_report(best_matches)
 
         round_obj = Round(index=round_index, matches=best_matches, quality_report=quality_report)
-        return round_obj, quality_report
+        return round_obj, quality_report, attempt + 1
 
     def _generate_matches_for_round(
         self,
