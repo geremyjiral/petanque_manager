@@ -70,7 +70,8 @@ def main() -> None:
             ):
                 if rounds:
                     st.markdown("**📊 Qualité des manches générées**")
-                    st.markdown(f"""Voici la méthode du calcul de la qualité utilisée :
+                    st.markdown(f"""
+                                Voici la méthode du calcul de la qualité utilisée :
                                 - En cas de partenaires répétés : pénalité de {ConfigScoringMatchs.repeated_partners_penalty} points par paire
                                 - En cas d'adversaires répétés : pénalité de {ConfigScoringMatchs.repeated_opponents_penalty} points par paire
                                 - En cas de terrains répétés : pénalité de {ConfigScoringMatchs.repeated_terrains_penalty} points par joueur

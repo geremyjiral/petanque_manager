@@ -32,7 +32,7 @@ class ConfigScoringMatchs:
     repeated_partners_penalty: float = 10.0
     repeated_opponents_penalty: float = 5.0
     repeated_terrains_penalty: float = 2.0
-    fallback_format_penalty_per_player: float = 4.0
+    fallback_format_penalty_per_player: float = 1.5
 
 
 @dataclass
