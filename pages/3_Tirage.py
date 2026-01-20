@@ -114,7 +114,9 @@ def main() -> None:
                         )
 
                     st.markdown("---")
-
+                if "generation_attempts" in st.session_state:
+                    attempts_prev: int = st.session_state["generation_attempts"]
+                    st.info(f"ℹ️ Dernière génération a pris {attempts_prev} tentatives.")
                 if len(rounds) >= config.rounds_count:
                     st.success("✅ Toutes les manches ont été générées !")
                     st.info(
@@ -195,9 +197,7 @@ def main() -> None:
 
                         except ValueError as e:
                             st.error(f"❌ Erreur lors de la génération : {e}")
-                    if "generation_attempts" in st.session_state:
-                        attempts_prev: int = st.session_state["generation_attempts"]
-                        st.info(f"ℹ️ Dernière génération a pris {attempts_prev} tentatives.")
+
                     if "quality_report" in st.session_state:
                         quality_report_prev: ScheduleQualityReport = st.session_state[
                             "quality_report"
@@ -256,6 +256,7 @@ def main() -> None:
                                 "⚠️ La qualité du planning pourrait être améliorée. "
                                 "Essayez de régénérer avec une autre graine (seed)."
                             )
+
     else:
         st.info(
             "🔒 Connexion requise pour générer des manches. Consultez les manches existantes ci-dessous."
