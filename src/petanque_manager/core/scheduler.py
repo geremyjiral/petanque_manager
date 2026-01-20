@@ -383,7 +383,7 @@ class TournamentScheduler:
         best_score = float("inf")
 
         good_enough_threshold = 10.0
-        min_attempts_before_early_stop = 30  # Minimum attempts before considering early stop
+        min_attempts_before_early_stop = 100  # Minimum attempts before considering early stop
         attempt = 0
         for attempt in range(attempts):
             if attempt > 0:
