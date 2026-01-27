@@ -11,6 +11,7 @@ from src.petanque_manager.core.models import (
     TournamentMode,
 )
 from src.petanque_manager.core.scheduler import (
+    ConstraintLevel,
     ConstraintTracker,
     TournamentScheduler,
     calculate_role_requirements,
@@ -127,7 +128,7 @@ def test_scheduler_generates_valid_round_doublette() -> None:
 
         scheduler = TournamentScheduler(mode=TournamentMode.DOUBLETTE, terrains_count=8)
 
-        round_obj, _quality_report = scheduler.generate_round(
+        round_obj, _quality_report, _attempts = scheduler.generate_round(
             players=players,
             round_index=0,
             previous_rounds=[],
@@ -159,7 +160,7 @@ def test_scheduler_generates_valid_round_triplette() -> None:
 
         scheduler = TournamentScheduler(mode=TournamentMode.TRIPLETTE, terrains_count=8)
 
-        round_obj, _quality_report = scheduler.generate_round(
+        round_obj, _quality_report, _attempts = scheduler.generate_round(
             players=players,
             round_index=0,
             previous_rounds=[],
@@ -266,7 +267,7 @@ def test_validate_team_roles_doublette_invalid() -> None:
 
 def test_constraint_tracker_partners() -> None:
     """Test constraint tracker records partners correctly."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     match = Match(
         id=1,
@@ -279,7 +280,7 @@ def test_constraint_tracker_partners() -> None:
         score_b=7,
     )
 
-    tracker.add_match(match, TournamentMode.TRIPLETTE)
+    tracker.add_match(match)
 
     # Check partners
     assert 2 in tracker.partners[1]
@@ -295,7 +296,7 @@ def test_constraint_tracker_partners() -> None:
 
 def test_constraint_tracker_scoring() -> None:
     """Test constraint tracker scores violations correctly."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # First match
     match1 = Match(
@@ -306,7 +307,7 @@ def test_constraint_tracker_scoring() -> None:
         team_a_player_ids=[1, 2, 3],
         team_b_player_ids=[4, 5, 6],
     )
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # Second match: players 1 and 2 play together again (repeated partners)
     score = tracker.score_match(
@@ -314,7 +315,6 @@ def test_constraint_tracker_scoring() -> None:
         [8, 9, 10],
         "B",
         MatchFormat.TRIPLETTE,
-        TournamentMode.TRIPLETTE,
     )
 
     # Should have penalty for repeated partners (1-2 pair)
@@ -345,7 +345,7 @@ def test_scheduler_generates_valid_round() -> None:
         seed=42,
     )
 
-    round_obj, quality_report = scheduler.generate_round(
+    round_obj, quality_report, _attempts = scheduler.generate_round(
         players=players,
         round_index=0,
         previous_rounds=[],
@@ -397,7 +397,7 @@ def test_scheduler_multiple_rounds_minimize_repetitions() -> None:
 
     # Generate 3 rounds
     for i in range(3):
-        round_obj, quality_report = scheduler.generate_round(
+        round_obj, quality_report, _attempts = scheduler.generate_round(
             players=players,
             round_index=i,
             previous_rounds=rounds,
@@ -443,7 +443,7 @@ def test_scheduler_handles_uneven_player_count() -> None:
     )
 
     # Should not raise error
-    round_obj, _quality_report = scheduler.generate_round(
+    round_obj, _quality_report, _attempts = scheduler.generate_round(
         players=players,
         round_index=0,
         previous_rounds=[],
@@ -517,3 +517,218 @@ def test_round_completion_status() -> None:
 
     # Now round should be complete
     assert round_obj.is_complete
+
+
+# ============================================================================
+# Tests for deterministic backtracking scheduler
+# ============================================================================
+
+
+def test_deterministic_scheduler_generates_valid_round() -> None:
+    """Test deterministic scheduler generates valid round with correct team compositions."""
+    # Create 12 players for TRIPLETTE mode
+    players = [
+        Player(id=1, name="T1", roles=[PlayerRole.TIREUR]),
+        Player(id=2, name="T2", roles=[PlayerRole.TIREUR]),
+        Player(id=3, name="T3", roles=[PlayerRole.TIREUR]),
+        Player(id=4, name="T4", roles=[PlayerRole.TIREUR]),
+        Player(id=5, name="P1", roles=[PlayerRole.POINTEUR]),
+        Player(id=6, name="P2", roles=[PlayerRole.POINTEUR]),
+        Player(id=7, name="P3", roles=[PlayerRole.POINTEUR]),
+        Player(id=8, name="P4", roles=[PlayerRole.POINTEUR]),
+        Player(id=9, name="M1", roles=[PlayerRole.MILIEU]),
+        Player(id=10, name="M2", roles=[PlayerRole.MILIEU]),
+        Player(id=11, name="M3", roles=[PlayerRole.MILIEU]),
+        Player(id=12, name="M4", roles=[PlayerRole.MILIEU]),
+    ]
+
+    scheduler = TournamentScheduler(
+        mode=TournamentMode.TRIPLETTE,
+        terrains_count=8,
+    )
+
+    round_obj, _quality_report, constraint_level = scheduler.generate_round_deterministic(
+        players=players,
+        round_index=0,
+        previous_rounds=[],
+    )
+
+    # First round should be at strict level (no repeats)
+    assert constraint_level == ConstraintLevel.STRICT
+
+    # Verify round structure
+    assert round_obj.index == 0
+    assert len(round_obj.matches) == 2  # 12 players = 2 triplette matches
+
+    # Verify all matches have correct format
+    for match in round_obj.matches:
+        assert match.format == MatchFormat.TRIPLETTE
+        assert len(match.team_a_player_ids) == 3
+        assert len(match.team_b_player_ids) == 3
+
+        # Verify no duplicate players in match
+        all_players_in_match = set(match.all_player_ids)
+        assert len(all_players_in_match) == 6
+
+
+def test_deterministic_scheduler_no_repeated_partners_or_opponents() -> None:
+    """Test deterministic scheduler generates first round without repeated partners/opponents."""
+    # Create 12 players with all roles
+    players = [
+        Player(
+            id=i,
+            name=f"P{i}",
+            roles=[PlayerRole.TIREUR, PlayerRole.POINTEUR, PlayerRole.MILIEU],
+        )
+        for i in range(1, 13)
+    ]
+
+    scheduler = TournamentScheduler(
+        mode=TournamentMode.TRIPLETTE,
+        terrains_count=8,
+    )
+
+    # First round should always be at strict level (no previous constraints)
+    round_obj, quality_report, constraint_level = scheduler.generate_round_deterministic(
+        players=players,
+        round_index=0,
+        previous_rounds=[],
+    )
+
+    assert constraint_level == ConstraintLevel.STRICT
+    assert quality_report.repeated_partners == 0
+    assert quality_report.repeated_opponents == 0
+
+    # Second round may need to relax constraints depending on player count
+    # With 12 players in triplette (4 teams of 3), it's mathematically impossible
+    # to have 2 perfect rounds - at least one team must repeat
+    round2, _quality_report2, constraint_level2 = scheduler.generate_round_deterministic(
+        players=players,
+        round_index=1,
+        previous_rounds=[round_obj],
+    )
+
+    # Second round should still be generated successfully
+    assert len(round2.matches) == 2
+    # Constraint level may be relaxed, which is acceptable
+    assert constraint_level2 in [
+        ConstraintLevel.STRICT,
+        ConstraintLevel.ALLOW_REPEATED_OPPONENTS,
+        ConstraintLevel.ALLOW_REPEATED_PARTNERS,
+    ]
+
+
+def test_deterministic_scheduler_relaxes_constraints_when_needed() -> None:
+    """Test deterministic scheduler relaxes constraints when strict is impossible."""
+    # Create 8 players with all roles (very constrained)
+    players = [
+        Player(
+            id=i,
+            name=f"P{i}",
+            roles=[PlayerRole.TIREUR, PlayerRole.POINTEUR, PlayerRole.MILIEU],
+        )
+        for i in range(1, 9)
+    ]
+
+    scheduler = TournamentScheduler(
+        mode=TournamentMode.DOUBLETTE,
+        terrains_count=8,
+    )
+
+    rounds: list[Round] = []
+
+    # Generate multiple rounds - at some point constraints must relax
+    for i in range(5):
+        round_obj, _quality_report, _constraint_level = scheduler.generate_round_deterministic(
+            players=players,
+            round_index=i,
+            previous_rounds=rounds,
+        )
+        rounds.append(round_obj)
+
+        # Verify round was generated
+        assert len(round_obj.matches) > 0
+
+    # With only 8 players and 5 rounds, we expect some constraint relaxation
+    # (but we don't mandate which level - just that it succeeds)
+
+
+def test_deterministic_scheduler_multiple_rounds_doublette() -> None:
+    """Test deterministic scheduler with doublette mode across multiple rounds."""
+    # Create 12 players with all roles
+    players = [
+        Player(
+            id=i,
+            name=f"P{i}",
+            roles=[PlayerRole.TIREUR, PlayerRole.POINTEUR, PlayerRole.MILIEU],
+        )
+        for i in range(1, 13)
+    ]
+
+    scheduler = TournamentScheduler(
+        mode=TournamentMode.DOUBLETTE,
+        terrains_count=8,
+    )
+
+    rounds: list[Round] = []
+
+    # Generate 3 rounds
+    for i in range(3):
+        round_obj, _quality_report, _constraint_level = scheduler.generate_round_deterministic(
+            players=players,
+            round_index=i,
+            previous_rounds=rounds,
+        )
+        rounds.append(round_obj)
+
+        # Verify round was generated
+        assert len(round_obj.matches) > 0
+
+        # Verify all players are used
+        players_used: set[int] = set()
+        for match in round_obj.matches:
+            players_used.update(match.all_player_ids)
+        assert len(players_used) == 12
+
+
+def test_deterministic_scheduler_respects_roles() -> None:
+    """Test deterministic scheduler respects role constraints."""
+    # Create players with specific roles (not all roles)
+    players = [
+        Player(id=1, name="T1", roles=[PlayerRole.TIREUR]),
+        Player(id=2, name="T2", roles=[PlayerRole.TIREUR]),
+        Player(id=3, name="T3", roles=[PlayerRole.TIREUR]),
+        Player(id=4, name="T4", roles=[PlayerRole.TIREUR]),
+        Player(id=5, name="P1", roles=[PlayerRole.POINTEUR]),
+        Player(id=6, name="P2", roles=[PlayerRole.POINTEUR]),
+        Player(id=7, name="P3", roles=[PlayerRole.POINTEUR]),
+        Player(id=8, name="P4", roles=[PlayerRole.POINTEUR]),
+        Player(id=9, name="M1", roles=[PlayerRole.MILIEU]),
+        Player(id=10, name="M2", roles=[PlayerRole.MILIEU]),
+        Player(id=11, name="M3", roles=[PlayerRole.MILIEU]),
+        Player(id=12, name="M4", roles=[PlayerRole.MILIEU]),
+    ]
+
+    scheduler = TournamentScheduler(
+        mode=TournamentMode.TRIPLETTE,
+        terrains_count=8,
+    )
+
+    round_obj, _quality_report, _constraint_level = scheduler.generate_round_deterministic(
+        players=players,
+        round_index=0,
+        previous_rounds=[],
+    )
+
+    # Verify each team has correct role composition
+    for match in round_obj.matches:
+        # Get players for each team
+        team_a_players = [p for p in players if p.id in match.team_a_player_ids]
+        team_b_players = [p for p in players if p.id in match.team_b_player_ids]
+
+        # Each triplette team should have: 1 TIREUR, 1 POINTEUR, 1 MILIEU
+        for team in [team_a_players, team_b_players]:
+            has_tireur = any(PlayerRole.TIREUR in p.roles for p in team)
+            has_pointeur = any(PlayerRole.POINTEUR in p.roles for p in team)
+            has_milieu = any(PlayerRole.MILIEU in p.roles for p in team)
+            assert has_tireur and has_pointeur and has_milieu

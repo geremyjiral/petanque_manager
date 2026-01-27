@@ -5,12 +5,16 @@ This module implements the round generation logic with soft constraints:
 - Minimize repeated opponents
 - Minimize repeated terrain assignments
 - Minimize fallback format usage
+
+It also provides a deterministic backtracking algorithm that guarantees
+finding a solution if one exists, with progressive constraint relaxation.
 """
 
 import random
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
+from itertools import combinations
 
 from src.petanque_manager.core.models import (
     Match,
@@ -26,6 +30,14 @@ from src.petanque_manager.utils.seed import set_random_seed
 from src.petanque_manager.utils.terrain_labels import get_terrain_label
 
 
+class ConstraintLevel:
+    """Constraint levels for progressive relaxation."""
+
+    STRICT = 0  # No repeated partners, no repeated opponents
+    ALLOW_REPEATED_OPPONENTS = 1  # Allow opponents to repeat (max 2 times total)
+    ALLOW_REPEATED_PARTNERS = 2  # Allow partners to repeat (max 2 times total)
+
+
 class ConfigScoringMatchs:
     """Configuration for scoring matches."""
 
@@ -39,62 +51,113 @@ class ConfigScoringMatchs:
 class ConstraintTracker:
     """Tracks constraint violations across rounds."""
 
-    # player_id -> set of player_ids they've played WITH
-    partners: dict[int, set[int]]
-    # player_id -> set of player_ids they've played AGAINST
-    opponents: dict[int, set[int]]
-    # player_id -> set of terrain labels they've played on
-    terrains: dict[int, set[str]]
-    # player_id -> count of matches in fallback format
-    fallback_formats: dict[int, int]
+    matches: list[Match]
 
-    def __init__(self) -> None:
-        """Initialize empty tracker."""
-        self.partners = defaultdict(set)
-        self.opponents = defaultdict(set)
-        self.terrains = defaultdict(set)
-        self.fallback_formats = defaultdict(int)
+    def __init__(self, tournament_mode: TournamentMode) -> None:
+        """Initialize tracker."""
+        self.matches = []
+        self.tournament_mode: TournamentMode = tournament_mode
+
+    @property
+    def partners(self) -> dict[int, set[int]]:
+        """Get partners mapping. Set of partners per player."""
+        players_id = {p_id for match in self.matches for p_id in match.all_player_ids}
+        partners: dict[int, set[int]] = {pid: set() for pid in players_id}
+        for match in self.matches:
+            for team in [match.team_a_player_ids, match.team_b_player_ids]:
+                for i, pid in enumerate(team):
+                    for other in team[i + 1 :]:
+                        partners[pid].add(other)
+                        partners[other].add(pid)
+        return partners
+
+    @property
+    def opponents(self) -> dict[int, set[int]]:
+        """Get opponents mapping. Set of opponents per player."""
+        players_id = {p_id for match in self.matches for p_id in match.all_player_ids}
+        opponents: dict[int, set[int]] = {pid: set() for pid in players_id}
+        for match in self.matches:
+            for pid_a in match.team_a_player_ids:
+                for pid_b in match.team_b_player_ids:
+                    opponents[pid_a].add(pid_b)
+                    opponents[pid_b].add(pid_a)
+        return opponents
+
+    @property
+    def terrains(self) -> dict[int, set[str]]:
+        """Get terrains mapping. Set of terrain labels per player."""
+        players_id = {p_id for match in self.matches for p_id in match.all_player_ids}
+        terrains: dict[int, set[str]] = {pid: set() for pid in players_id}
+        for match in self.matches:
+            for pid in match.all_player_ids:
+                terrains[pid].add(match.terrain_label)
+        return terrains
+
+    @property
+    def fallback_formats(self) -> dict[int, int]:
+        """Get fallback format counts. Count of matches in fallback format per player."""
+        players_id = {p_id for match in self.matches for p_id in match.all_player_ids}
+        fallback_formats: dict[int, int] = dict.fromkeys(players_id, 0)
+        for match in self.matches:
+            is_fallback = (
+                self.tournament_mode == TournamentMode.TRIPLETTE
+                and match.format == MatchFormat.DOUBLETTE
+            ) or (
+                self.tournament_mode == TournamentMode.DOUBLETTE
+                and match.format == MatchFormat.TRIPLETTE
+            )
+
+            if is_fallback:
+                for pid in match.all_player_ids:
+                    fallback_formats[pid] += 1
+        return fallback_formats
+
+    @property
+    def partner_counts(self) -> dict[tuple[int, int], int]:
+        """Get partner counts mapping. Count of times they've been partners (for relaxed constraints)"""
+        partner_counts: dict[tuple[int, int], int] = defaultdict(int)
+        for match in self.matches:
+            for team in [match.team_a_player_ids, match.team_b_player_ids]:
+                for i, pid1 in enumerate(team):
+                    for pid2 in team[i + 1 :]:
+                        pair = (min(pid1, pid2), max(pid1, pid2))
+                        partner_counts[pair] += 1
+        return partner_counts
+
+    @property
+    def opponent_counts(self) -> dict[tuple[int, int], int]:
+        """Get opponent counts mapping. Count of times they've been opponents (for relaxed constraints)"""
+        opponent_counts: dict[tuple[int, int], int] = defaultdict(int)
+        for match in self.matches:
+            for pid_a in match.team_a_player_ids:
+                for pid_b in match.team_b_player_ids:
+                    pair = (min(pid_a, pid_b), max(pid_a, pid_b))
+                    opponent_counts[pair] += 1
+        return opponent_counts
 
     def add_match(
         self,
         match: Match,
-        tournament_mode: TournamentMode,
     ) -> None:
         """Record a match in the tracker.
 
         Args:
             match: Match to record
-            tournament_mode: Current tournament mode (to detect fallback format)
         """
-        # Record partners
-        for pid in match.team_a_player_ids:
-            for other in match.team_a_player_ids:
-                if pid != other:
-                    self.partners[pid].add(other)
+        # Record partners (with counts for relaxed constraints)
+        # Use indexed iteration to count each pair only once
 
-        for pid in match.team_b_player_ids:
-            for other in match.team_b_player_ids:
-                if pid != other:
-                    self.partners[pid].add(other)
+        self.matches.append(match)
 
-        # Record opponents
-        for pid_a in match.team_a_player_ids:
-            for pid_b in match.team_b_player_ids:
-                self.opponents[pid_a].add(pid_b)
-                self.opponents[pid_b].add(pid_a)
+    def get_partner_count(self, pid1: int, pid2: int) -> int:
+        """Get number of times two players have been partners."""
+        pair = (min(pid1, pid2), max(pid1, pid2))
+        return self.partner_counts[pair]
 
-        # Record terrains
-        for pid in match.all_player_ids:
-            self.terrains[pid].add(match.terrain_label)
-
-        # Record fallback format
-        is_fallback = (
-            tournament_mode == TournamentMode.TRIPLETTE and match.format == MatchFormat.DOUBLETTE
-        ) or (tournament_mode == TournamentMode.DOUBLETTE and match.format == MatchFormat.TRIPLETTE)
-
-        if is_fallback:
-            for pid in match.all_player_ids:
-                self.fallback_formats[pid] += 1
+    def get_opponent_count(self, pid1: int, pid2: int) -> int:
+        """Get number of times two players have been opponents."""
+        pair = (min(pid1, pid2), max(pid1, pid2))
+        return self.opponent_counts[pair]
 
     def score_match(
         self,
@@ -102,50 +165,53 @@ class ConstraintTracker:
         team_b: list[int],
         terrain: str,
         match_format: MatchFormat,
-        tournament_mode: TournamentMode,
     ) -> float:
         """Score a potential match based on constraint violations.
 
         Lower score is better (fewer violations).
+        Uses squared counts for partners/opponents to strongly penalize repeated pairings.
 
         Args:
             team_a: Player IDs for team A
             team_b: Player IDs for team B
             terrain: Terrain label
             match_format: Match format
-            tournament_mode: Tournament mode
 
         Returns:
             Penalty score (lower is better)
         """
         score = 0.0
 
-        # Check repeated partners (strong penalty: 10 points per violation)
-        for pid in team_a:
-            for other in team_a:
-                if pid != other and other in self.partners[pid]:
-                    score += ConfigScoringMatchs.repeated_partners_penalty
+        # Check repeated partners - use squared count for strong penalty
+        # penalty = base_penalty * count^2 (so 2x repeat = 4x penalty, 3x = 9x, etc.)
+        for team in [team_a, team_b]:
+            for i, pid in enumerate(team):
+                for other in team[i + 1 :]:
+                    count = self.get_partner_count(pid, other)
+                    if count > 0:
+                        score += ConfigScoringMatchs.repeated_partners_penalty * (count**2)
 
-        for pid in team_b:
-            for other in team_b:
-                if pid != other and other in self.partners[pid]:
-                    score += ConfigScoringMatchs.repeated_partners_penalty
-
-        # Check repeated opponents (medium penalty: 5 points per violation)
+        # Check repeated opponents - use squared count
         for pid_a in team_a:
             for pid_b in team_b:
-                if pid_b in self.opponents[pid_a]:
-                    score += ConfigScoringMatchs.repeated_opponents_penalty
+                count = self.get_opponent_count(pid_a, pid_b)
+                if count > 0:
+                    score += ConfigScoringMatchs.repeated_opponents_penalty * (count**2)
 
         # Check repeated terrains (medium penalty: 2 points per violation)
+        terrains = self.terrains
         for pid in team_a + team_b:
-            if terrain in self.terrains[pid]:
+            if pid in terrains and terrain in terrains[pid]:
                 score += ConfigScoringMatchs.repeated_terrains_penalty
 
-        # Check fallback format (medium penalty: 4 points per player)
+        # Check fallback format (medium penalty per player)
         is_fallback = (
-            tournament_mode == TournamentMode.TRIPLETTE and match_format == MatchFormat.DOUBLETTE
-        ) or (tournament_mode == TournamentMode.DOUBLETTE and match_format == MatchFormat.TRIPLETTE)
+            self.tournament_mode == TournamentMode.TRIPLETTE
+            and match_format == MatchFormat.DOUBLETTE
+        ) or (
+            self.tournament_mode == TournamentMode.DOUBLETTE
+            and match_format == MatchFormat.TRIPLETTE
+        )
 
         if is_fallback:
             score += ConfigScoringMatchs.fallback_format_penalty_per_player * len(team_a + team_b)
@@ -320,7 +386,7 @@ class TournamentScheduler:
         self.mode = mode
         self.terrains_count = terrains_count
         self.seed = seed
-        self.tracker = ConstraintTracker()
+        self.tracker = ConstraintTracker(mode)
 
         if seed is not None:
             set_random_seed(seed)
@@ -351,11 +417,11 @@ class TournamentScheduler:
         """
         # Update tracker with previous rounds
         if round_index == 0:
-            self.tracker = ConstraintTracker()
+            self.tracker = ConstraintTracker(self.mode)
 
         for prev_round in previous_rounds:
             for match in prev_round.matches:
-                self.tracker.add_match(match, self.mode)
+                self.tracker.add_match(match)
 
         # Determine match composition
         player_count = len(players)
@@ -389,12 +455,11 @@ class TournamentScheduler:
             if attempt > 0:
                 random.shuffle(shuffled_players)
 
-            temp_tracker = ConstraintTracker()
+            temp_tracker = ConstraintTracker(self.mode)
             # Copy previous rounds' constraints
             for prev_round in previous_rounds:
                 for match in prev_round.matches:
-                    temp_tracker.add_match(match, self.mode)
-
+                    temp_tracker.add_match(match)
             try:
                 matches = self._generate_matches_for_round(
                     shuffled_players, round_index, temp_tracker
@@ -427,6 +492,400 @@ class TournamentScheduler:
 
         round_obj = Round(index=round_index, matches=best_matches, quality_report=quality_report)
         return round_obj, quality_report, attempt + 1
+
+    def generate_round_deterministic(
+        self,
+        players: list[Player],
+        round_index: int,
+        previous_rounds: list[Round],
+        progress_callback: Callable[[int, str], None] | None = None,
+    ) -> tuple[Round, ScheduleQualityReport, int]:
+        """Generate a round using deterministic backtracking algorithm.
+
+        This method guarantees finding a solution if one exists, using progressive
+        constraint relaxation:
+        1. First try: no repeated partners, no repeated opponents
+        2. If fails: allow repeated opponents (max 2 times per pair)
+        3. If fails: allow repeated partners (max 2 times per pair)
+
+        Args:
+            players: List of active players
+            round_index: Index of this round (0-based)
+            previous_rounds: Previously generated rounds
+            progress_callback: Optional callback(level, message) for progress updates
+
+        Returns:
+            Tuple of (generated round, quality report, constraint_level_used)
+
+        Raises:
+            ValueError: If unable to generate valid round even with relaxed constraints
+        """
+        # Always rebuild tracker from scratch based on previous rounds
+        # This ensures consistent state regardless of how the function is called
+        self.tracker = ConstraintTracker(self.mode)
+        for prev_round in previous_rounds:
+            for match in prev_round.matches:
+                self.tracker.add_match(match)
+
+        player_count = len(players)
+        if player_count < 4:
+            raise ValueError("Need at least 4 players to generate matches")
+
+        # Get optimal match distribution
+        nb_3v3, nb_2v2, nb_3v2 = _find_optimal_match_distribution(player_count, self.mode)
+
+        # Build all valid teams
+        all_valid_teams = self._build_all_valid_teams(players)
+
+        # Try each constraint level
+        for level in [
+            ConstraintLevel.STRICT,
+            ConstraintLevel.ALLOW_REPEATED_OPPONENTS,
+            ConstraintLevel.ALLOW_REPEATED_PARTNERS,
+        ]:
+            level_name = [
+                "strict (no repeats)",
+                "relaxed (allow repeated opponents)",
+                "relaxed (allow repeated partners)",
+            ][level]
+
+            if progress_callback:
+                progress_callback(level, f"Trying {level_name}...")
+
+            matches = self._backtrack_find_matches(
+                all_valid_teams=all_valid_teams,
+                nb_3v3=nb_3v3,
+                nb_2v2=nb_2v2,
+                nb_3v2=nb_3v2,
+                round_index=round_index,
+                constraint_level=level,
+            )
+
+            if matches is not None:
+                if progress_callback:
+                    progress_callback(level, f"Found solution at level: {level_name}")
+
+                # Generate quality report BEFORE updating tracker
+                # so it correctly counts repetitions vs existing history
+                quality_report = self._generate_quality_report(matches)
+
+                # Now update tracker with the new matches for future rounds
+                for match in matches:
+                    self.tracker.add_match(match)
+
+                round_obj = Round(index=round_index, matches=matches, quality_report=quality_report)
+                return round_obj, quality_report, level
+
+        raise ValueError(
+            "Unable to generate valid round even with relaxed constraints. "
+            "This may indicate too many rounds for the number of players."
+        )
+
+    def _build_all_valid_teams(
+        self,
+        players: list[Player],
+    ) -> dict[MatchFormat, list[tuple[int, ...]]]:
+        """Build all valid teams for each match format.
+
+        Args:
+            players: All available players
+
+        Returns:
+            Dictionary mapping format to list of valid teams (as tuples of player IDs)
+        """
+        valid_teams: dict[MatchFormat, list[tuple[int, ...]]] = {
+            MatchFormat.TRIPLETTE: [],
+            MatchFormat.DOUBLETTE: [],
+        }
+
+        player_ids = [p.id for p in players if p.id is not None]
+
+        # Generate triplette teams (3 players)
+        for combo_3 in combinations(player_ids, 3):
+            team_players = [p for p in players if p.id in combo_3]
+            if validate_team_roles(team_players, MatchFormat.TRIPLETTE, self.mode):
+                valid_teams[MatchFormat.TRIPLETTE].append(combo_3)
+
+        # Generate doublette teams (2 players)
+        for combo_2 in combinations(player_ids, 2):
+            team_players = [p for p in players if p.id in combo_2]
+            if validate_team_roles(team_players, MatchFormat.DOUBLETTE, self.mode):
+                valid_teams[MatchFormat.DOUBLETTE].append(combo_2)
+
+        return valid_teams
+
+    def _is_match_valid(
+        self,
+        team_a: tuple[int, ...],
+        team_b: tuple[int, ...],
+        constraint_level: int,
+    ) -> bool:
+        """Check if a match is valid given the constraint level.
+
+        Args:
+            team_a: Player IDs for team A
+            team_b: Player IDs for team B
+            constraint_level: Current constraint level
+
+        Returns:
+            True if match is valid, False otherwise
+        """
+        # Check no player overlap
+        if set(team_a) & set(team_b):
+            return False
+
+        # Check partner constraints
+        for team in [team_a, team_b]:
+            for i, pid1 in enumerate(team):
+                for pid2 in team[i + 1 :]:
+                    count = self.tracker.get_partner_count(pid1, pid2)
+                    if constraint_level < ConstraintLevel.ALLOW_REPEATED_PARTNERS:
+                        # Strict or allow opponents only: no repeated partners
+                        if count > 0:
+                            return False
+                    else:
+                        # Allow repeated partners: max 2 times total
+                        if count >= 2:
+                            return False
+
+        # Check opponent constraints
+        for pid_a in team_a:
+            for pid_b in team_b:
+                count = self.tracker.get_opponent_count(pid_a, pid_b)
+                if constraint_level < ConstraintLevel.ALLOW_REPEATED_OPPONENTS:
+                    # Strict: no repeated opponents
+                    if count > 0:
+                        return False
+                else:
+                    # Allow repeated opponents: max 2 times total
+                    if count >= 2:
+                        return False
+
+        return True
+
+    def _backtrack_find_matches(
+        self,
+        all_valid_teams: dict[MatchFormat, list[tuple[int, ...]]],
+        nb_3v3: int,
+        nb_2v2: int,
+        nb_3v2: int,
+        round_index: int,
+        constraint_level: int,
+    ) -> list[Match] | None:
+        """Use backtracking to find a valid set of matches.
+
+        Args:
+            all_valid_teams: All valid teams by format
+            nb_3v3: Number of 3v3 matches needed
+            nb_2v2: Number of 2v2 matches needed
+            nb_3v2: Number of 3v2 hybrid matches needed
+            round_index: Current round index
+            constraint_level: Current constraint level
+
+        Returns:
+            List of matches if found, None otherwise
+        """
+        # Build list of match requirements
+        match_requirements: list[tuple[MatchFormat, MatchFormat | None]] = []
+
+        # 3v3 matches: both teams are triplettes
+        for _ in range(nb_3v3):
+            match_requirements.append((MatchFormat.TRIPLETTE, MatchFormat.TRIPLETTE))
+
+        # 2v2 matches: both teams are doublettes
+        for _ in range(nb_2v2):
+            match_requirements.append((MatchFormat.DOUBLETTE, MatchFormat.DOUBLETTE))
+
+        # 3v2 hybrid matches: one triplette, one doublette
+        for _ in range(nb_3v2):
+            match_requirements.append((MatchFormat.TRIPLETTE, MatchFormat.DOUBLETTE))
+
+        if not match_requirements:
+            return []
+
+        # Start backtracking
+        used_players: set[int] = set()
+        matches: list[Match] = []
+
+        # Create a temporary tracker to track constraints within this round
+        temp_tracker = ConstraintTracker(self.mode)
+        # Copy previous constraints
+        temp_tracker.matches = self.tracker.matches.copy()
+
+        result = self._backtrack_recursive(
+            match_requirements=match_requirements,
+            match_index=0,
+            all_valid_teams=all_valid_teams,
+            used_players=used_players,
+            matches=matches,
+            round_index=round_index,
+            constraint_level=constraint_level,
+            temp_tracker=temp_tracker,
+        )
+
+        return result
+
+    def _backtrack_recursive(
+        self,
+        match_requirements: list[tuple[MatchFormat, MatchFormat | None]],
+        match_index: int,
+        all_valid_teams: dict[MatchFormat, list[tuple[int, ...]]],
+        used_players: set[int],
+        matches: list[Match],
+        round_index: int,
+        constraint_level: int,
+        temp_tracker: ConstraintTracker,
+    ) -> list[Match] | None:
+        """Recursive backtracking to find valid matches.
+
+        Args:
+            match_requirements: List of (team_a_format, team_b_format) for each match
+            match_index: Current match being filled
+            all_valid_teams: All valid teams by format
+            used_players: Set of already used player IDs
+            matches: Current list of matches
+            round_index: Current round index
+            constraint_level: Current constraint level
+            temp_tracker: Temporary tracker for this round
+
+        Returns:
+            List of matches if solution found, None otherwise
+        """
+        # Base case: all matches filled
+        if match_index >= len(match_requirements):
+            return matches.copy()
+
+        format_a, format_b = match_requirements[match_index]
+
+        # Get available teams for team A
+        teams_a = [t for t in all_valid_teams[format_a] if not (set(t) & used_players)]
+
+        for team_a in teams_a:
+            # Mark team A players as used
+            used_players.update(team_a)
+
+            # Get available teams for team B
+            if format_b is not None:
+                teams_b = [t for t in all_valid_teams[format_b] if not (set(t) & used_players)]
+            else:
+                teams_b = [()]  # Placeholder for single-team formats
+
+            for team_b in teams_b:
+                if format_b is None:
+                    continue
+
+                # Check if this match is valid with current constraints
+                if not self._is_match_valid_with_tracker(
+                    team_a, team_b, constraint_level, temp_tracker
+                ):
+                    continue
+
+                # Mark team B players as used
+                used_players.update(team_b)
+
+                # Determine match format
+                if format_a == format_b:
+                    match_format = format_a
+                else:
+                    match_format = MatchFormat.HYBRID
+
+                # Create match
+                terrain_label = get_terrain_label(match_index)
+                match = Match(
+                    round_index=round_index,
+                    terrain_label=terrain_label,
+                    format=match_format,
+                    team_a_player_ids=list(team_a),
+                    team_b_player_ids=list(team_b),
+                )
+                matches.append(match)
+
+                # Update temp tracker
+                self._add_match_to_temp_tracker(temp_tracker, match)
+
+                # Recurse
+                result = self._backtrack_recursive(
+                    match_requirements=match_requirements,
+                    match_index=match_index + 1,
+                    all_valid_teams=all_valid_teams,
+                    used_players=used_players,
+                    matches=matches,
+                    round_index=round_index,
+                    constraint_level=constraint_level,
+                    temp_tracker=temp_tracker,
+                )
+
+                if result is not None:
+                    return result
+
+                # Backtrack: remove match and restore tracker
+                matches.pop()
+                self._remove_match_from_temp_tracker(temp_tracker, match)
+                used_players.difference_update(team_b)
+
+            # Backtrack: restore team A players
+            used_players.difference_update(team_a)
+
+        return None
+
+    def _is_match_valid_with_tracker(
+        self,
+        team_a: tuple[int, ...],
+        team_b: tuple[int, ...],
+        constraint_level: int,
+        tracker: ConstraintTracker,
+    ) -> bool:
+        """Check if a match is valid using a specific tracker.
+
+        Args:
+            team_a: Player IDs for team A
+            team_b: Player IDs for team B
+            constraint_level: Current constraint level
+            tracker: Constraint tracker to use
+
+        Returns:
+            True if match is valid, False otherwise
+        """
+        # Check partner constraints
+        for team in [team_a, team_b]:
+            for i, pid1 in enumerate(team):
+                for pid2 in team[i + 1 :]:
+                    count = tracker.get_partner_count(pid1, pid2)
+                    if constraint_level < ConstraintLevel.ALLOW_REPEATED_PARTNERS:
+                        if count > 0:
+                            return False
+                    else:
+                        if count >= 2:
+                            return False
+
+        # Check opponent constraints
+        for pid_a in team_a:
+            for pid_b in team_b:
+                count = tracker.get_opponent_count(pid_a, pid_b)
+                if constraint_level < ConstraintLevel.ALLOW_REPEATED_OPPONENTS:
+                    if count > 0:
+                        return False
+                else:
+                    if count >= 2:
+                        return False
+
+        return True
+
+    def _add_match_to_temp_tracker(
+        self,
+        tracker: ConstraintTracker,
+        match: Match,
+    ) -> None:
+        """Add a match to a temporary tracker."""
+        tracker.add_match(match)
+
+    def _remove_match_from_temp_tracker(
+        self,
+        tracker: ConstraintTracker,
+        match: Match,
+    ) -> None:
+        """Remove a match from a temporary tracker (for backtracking)."""
+        tracker.matches.remove(match)
 
     def _generate_matches_for_round(
         self,
@@ -487,7 +946,7 @@ class TournamentScheduler:
                 team_b_player_ids=[p.id for p in team_b if p.id is not None],
             )
             matches.append(match)
-            tracker.add_match(match, self.mode)
+            tracker.add_match(match)
             terrain_index += 1
 
         # Generate 2v2 matches
@@ -519,7 +978,7 @@ class TournamentScheduler:
                 team_b_player_ids=[p.id for p in team_b if p.id is not None],
             )
             matches.append(match)
-            tracker.add_match(match, self.mode)
+            tracker.add_match(match)
             terrain_index += 1
 
         # Generate 3v2 hybrid matches
@@ -553,7 +1012,7 @@ class TournamentScheduler:
                 team_b_player_ids=[p.id for p in team_2 if p.id is not None],
             )
             matches.append(match)
-            tracker.add_match(match, self.mode)
+            tracker.add_match(match)
             terrain_index += 1
 
         if not matches:
@@ -688,7 +1147,6 @@ class TournamentScheduler:
                 match.team_b_player_ids,
                 match.terrain_label,
                 match.format,
-                self.mode,
             )
             total_score += score
         return total_score
@@ -702,33 +1160,35 @@ class TournamentScheduler:
         Returns:
             Quality report
         """
-        # Count violations
+        # Count violations using tracker's count methods for accuracy
         repeated_partners = 0
         repeated_opponents = 0
         repeated_terrains = 0
         fallback_count = 0
 
-        for match in matches:
-            # Check partners
-            for pid in match.team_a_player_ids:
-                for other in match.team_a_player_ids:
-                    if pid != other and other in self.tracker.partners[pid]:
-                        repeated_partners += 1
+        # Get cached properties once to avoid recomputing
+        partners = self.tracker.partners
+        opponents = self.tracker.opponents
+        terrains = self.tracker.terrains
 
-            for pid in match.team_b_player_ids:
-                for other in match.team_b_player_ids:
-                    if pid != other and other in self.tracker.partners[pid]:
-                        repeated_partners += 1
+        for match in matches:
+            # Check partners - count pairs that already exist in tracker
+            for team in [match.team_a_player_ids, match.team_b_player_ids]:
+                for i, pid in enumerate(team):
+                    for other in team[i + 1 :]:
+                        # Use get() to handle case where player not yet in tracker
+                        if other in partners.get(pid, set()):
+                            repeated_partners += 1
 
             # Check opponents
             for pid_a in match.team_a_player_ids:
                 for pid_b in match.team_b_player_ids:
-                    if pid_b in self.tracker.opponents[pid_a]:
+                    if pid_b in opponents.get(pid_a, set()):
                         repeated_opponents += 1
 
             # Check terrains
             for pid in match.all_player_ids:
-                if match.terrain_label in self.tracker.terrains[pid]:
+                if match.terrain_label in terrains.get(pid, set()):
                     repeated_terrains += 1
 
             # Check fallback/hybrid
@@ -742,10 +1202,6 @@ class TournamentScheduler:
 
             if is_fallback:
                 fallback_count += 1
-
-        # Divide by 2 for partners and opponents (counted twice)
-        repeated_partners //= 2
-        repeated_opponents //= 2
 
         total_score = self._score_matches(matches)
 

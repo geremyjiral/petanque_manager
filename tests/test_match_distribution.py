@@ -192,7 +192,7 @@ class TestHybridMatchGeneration:
         players = self.create_players(5)
         scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
 
-        round_obj, _quality_report = scheduler.generate_round(players, 0, [])
+        round_obj, _quality_report, _attempts = scheduler.generate_round(players, 0, [])
 
         # Should have 1 match
         assert len(round_obj.matches) == 1
@@ -210,7 +210,7 @@ class TestHybridMatchGeneration:
         players = self.create_players(10)
         scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
 
-        round_obj, _quality_report = scheduler.generate_round(players, 0, [])
+        round_obj, _quality_report, _attempts = scheduler.generate_round(players, 0, [])
 
         # Count total players in all matches
         all_player_ids: set[int] = set()
@@ -226,7 +226,7 @@ class TestHybridMatchGeneration:
         players = self.create_players(11)
         scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
 
-        round_obj, _quality_report = scheduler.generate_round(players, 0, [])
+        round_obj, _quality_report, _attempts = scheduler.generate_round(players, 0, [])
 
         # Count total players in all matches
         all_player_ids: set[int] = set()

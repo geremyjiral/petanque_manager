@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from Acceuil import get_storage
-from src.petanque_manager.core.models import Player, ScheduleQualityReport
+from src.petanque_manager.core.models import Player, Round, ScheduleQualityReport
 from src.petanque_manager.core.scheduler import ConfigScoringMatchs, TournamentScheduler
 from src.petanque_manager.infra.auth import is_authenticated, show_login_form
 
@@ -66,7 +66,7 @@ def main() -> None:
                 "🎲 Générer une nouvelle manche"
                 if len(rounds) < config.rounds_count
                 else "✅ Toutes les manches sont générées",
-                expanded=len(rounds) < config.rounds_count,
+                expanded=True,
             ):
                 if rounds:
                     st.markdown("**📊 Qualité des manches générées**")
@@ -119,6 +119,7 @@ def main() -> None:
                     st.info(f"ℹ️ Dernière génération a pris {attempts_prev} tentatives.")
                 if len(rounds) >= config.rounds_count:
                     st.success("✅ Toutes les manches ont été générées !")
+                    bag_quality_warning(rounds, players_by_id)
                     st.info(
                         "Pour générer plus de manches, augmentez le champ "
                         "« Nombre de manches » dans la configuration sur la page d'accueil."
@@ -537,6 +538,58 @@ def main() -> None:
     st.caption(
         "💡 Astuce : la génération des manches utilise des algorithmes pour minimiser les partenaires et adversaires répétés."
     )
+
+
+def bag_quality_warning(rounds: list[Round], players_by_id: dict[int, Player]) -> None:
+    players_partners: dict[int, dict[int, int]] = {}
+    players_opponents: dict[int, dict[int, int]] = {}
+    for r in rounds:
+        for m in r.matches:
+            for pid in m.team_a_player_ids:
+                if pid not in players_partners:
+                    players_partners[pid] = {}
+                for partner in set(m.team_a_player_ids) - {pid}:
+                    players_partners[pid][partner] = players_partners[pid].get(partner, 0) + 1
+                if pid not in players_opponents:
+                    players_opponents[pid] = {}
+                for opponent in set(m.team_b_player_ids):
+                    players_opponents[pid][opponent] = players_opponents[pid].get(opponent, 0) + 1
+            for pid in m.team_b_player_ids:
+                if pid not in players_partners:
+                    players_partners[pid] = {}
+                for partner in set(m.team_b_player_ids) - {pid}:
+                    players_partners[pid][partner] = players_partners[pid].get(partner, 0) + 1
+                if pid not in players_opponents:
+                    players_opponents[pid] = {}
+                for opponent in set(m.team_a_player_ids):
+                    players_opponents[pid][opponent] = players_opponents[pid].get(opponent, 0) + 1
+    partners_warnings: set[tuple[int, int]] = set()
+    for p, partners in players_partners.items():
+        for partner, count in partners.items():
+            if count > 1:
+                if (min(p, partner), max(p, partner)) not in partners_warnings:
+                    partners_warnings.add((min(p, partner), max(p, partner)))
+
+    opponents_warnings: set[tuple[int, int]] = set()
+    for p, opponents in players_opponents.items():
+        for opponent, count in opponents.items():
+            if count > 1:
+                if (min(p, opponent), max(p, opponent)) not in opponents_warnings:
+                    opponents_warnings.add((min(p, opponent), max(p, opponent)))
+
+    with st.container(border=True):
+        st.warning("⚠️ Partenaires similaires !")
+        for p1, p2 in partners_warnings:
+            name1 = players_by_id[p1].name if p1 in players_by_id else f"Joueur {p1}"
+            name2 = players_by_id[p2].name if p2 in players_by_id else f"Joueur {p2}"
+            st.warning(f"Les joueurs {name1} et {name2} seront partenaires plusieurs fois.")
+
+    with st.container(border=True):
+        st.warning("⚠️ Adversaires similaires !")
+        for p1, p2 in opponents_warnings:
+            name1 = players_by_id[p1].name if p1 in players_by_id else f"Joueur {p1}"
+            name2 = players_by_id[p2].name if p2 in players_by_id else f"Joueur {p2}"
+            st.warning(f"⚠️ Les joueurs {name1} et {name2} vont s'affronter plusieurs fois.")
 
 
 if __name__ == "__main__":

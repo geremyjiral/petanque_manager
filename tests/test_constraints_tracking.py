@@ -6,7 +6,7 @@ from src.petanque_manager.core.scheduler import ConstraintTracker
 
 def test_constraint_tracker_initialization() -> None:
     """Test constraint tracker initializes correctly."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     assert len(tracker.partners) == 0
     assert len(tracker.opponents) == 0
@@ -16,7 +16,7 @@ def test_constraint_tracker_initialization() -> None:
 
 def test_track_partners() -> None:
     """Test tracking of player partners."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # Players 1, 2, 3 on team A
     match = Match(
@@ -27,7 +27,7 @@ def test_track_partners() -> None:
         team_b_player_ids=[4, 5, 6],
     )
 
-    tracker.add_match(match, TournamentMode.TRIPLETTE)
+    tracker.add_match(match)
 
     # Player 1's partners should be 2 and 3
     assert tracker.partners[1] == {2, 3}
@@ -40,7 +40,7 @@ def test_track_partners() -> None:
 
 def test_track_opponents() -> None:
     """Test tracking of player opponents."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     match = Match(
         round_index=0,
@@ -50,7 +50,7 @@ def test_track_opponents() -> None:
         team_b_player_ids=[4, 5, 6],
     )
 
-    tracker.add_match(match, TournamentMode.TRIPLETTE)
+    tracker.add_match(match)
 
     # Player 1's opponents should be 4, 5, 6
     assert tracker.opponents[1] == {4, 5, 6}
@@ -61,7 +61,7 @@ def test_track_opponents() -> None:
 
 def test_track_terrains() -> None:
     """Test tracking of terrain usage."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     match1 = Match(
         round_index=0,
@@ -79,8 +79,8 @@ def test_track_terrains() -> None:
         team_b_player_ids=[9, 10, 11],
     )
 
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
-    tracker.add_match(match2, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
+    tracker.add_match(match2)
 
     # Player 1 has played on terrains A and B
     assert tracker.terrains[1] == {"A", "B"}
@@ -91,7 +91,7 @@ def test_track_terrains() -> None:
 
 def test_track_fallback_formats() -> None:
     """Test tracking of fallback format usage."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # Doublette match in TRIPLETTE mode (fallback)
     match1 = Match(
@@ -102,7 +102,7 @@ def test_track_fallback_formats() -> None:
         team_b_player_ids=[3, 4],
     )
 
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # All 4 players should have fallback count = 1
     assert tracker.fallback_formats[1] == 1
@@ -119,7 +119,7 @@ def test_track_fallback_formats() -> None:
         team_b_player_ids=[7, 8, 9],
     )
 
-    tracker.add_match(match2, TournamentMode.TRIPLETTE)
+    tracker.add_match(match2)
 
     # Player 1's fallback count should still be 1
     assert tracker.fallback_formats[1] == 1
@@ -130,7 +130,7 @@ def test_track_fallback_formats() -> None:
 
 def test_score_repeated_partners() -> None:
     """Test scoring penalty for repeated partners."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # First match: players 1 and 2 together
     match1 = Match(
@@ -140,7 +140,7 @@ def test_score_repeated_partners() -> None:
         team_a_player_ids=[1, 2, 3],
         team_b_player_ids=[4, 5, 6],
     )
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # Score a new match with players 1 and 2 together again
     score = tracker.score_match(
@@ -148,7 +148,6 @@ def test_score_repeated_partners() -> None:
         team_b=[8, 9, 10],
         terrain="B",
         match_format=MatchFormat.TRIPLETTE,
-        tournament_mode=TournamentMode.TRIPLETTE,
     )
 
     # Should have penalty for repeated partner (1-2)
@@ -158,7 +157,7 @@ def test_score_repeated_partners() -> None:
 
 def test_score_repeated_opponents() -> None:
     """Test scoring penalty for repeated opponents."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # First match: player 1 vs players 4, 5, 6
     match1 = Match(
@@ -168,7 +167,7 @@ def test_score_repeated_opponents() -> None:
         team_a_player_ids=[1, 2, 3],
         team_b_player_ids=[4, 5, 6],
     )
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # Score a new match with player 1 vs player 4 again
     score = tracker.score_match(
@@ -176,7 +175,6 @@ def test_score_repeated_opponents() -> None:
         team_b=[4, 9, 10],
         terrain="B",
         match_format=MatchFormat.TRIPLETTE,
-        tournament_mode=TournamentMode.TRIPLETTE,
     )
 
     # Should have penalty for repeated opponent (1 vs 4)
@@ -186,7 +184,7 @@ def test_score_repeated_opponents() -> None:
 
 def test_score_repeated_terrain() -> None:
     """Test scoring penalty for repeated terrain usage."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # First match: player 1 on terrain A
     match1 = Match(
@@ -196,7 +194,7 @@ def test_score_repeated_terrain() -> None:
         team_a_player_ids=[1, 2, 3],
         team_b_player_ids=[4, 5, 6],
     )
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # Score a new match with player 1 on terrain A again
     score = tracker.score_match(
@@ -204,17 +202,16 @@ def test_score_repeated_terrain() -> None:
         team_b=[9, 10, 11],
         terrain="A",  # Same terrain
         match_format=MatchFormat.TRIPLETTE,
-        tournament_mode=TournamentMode.TRIPLETTE,
     )
 
     # Should have penalty for repeated terrain (player 1 on A)
-    # Penalty is 3 points per player on repeated terrain
+    # Penalty is 2 points per player on repeated terrain
     assert score >= 2.0
 
 
 def test_score_fallback_format() -> None:
     """Test scoring penalty for fallback format usage."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # Score a doublette match in TRIPLETTE mode (fallback)
     score = tracker.score_match(
@@ -222,18 +219,17 @@ def test_score_fallback_format() -> None:
         team_b=[3, 4],
         terrain="A",
         match_format=MatchFormat.DOUBLETTE,
-        tournament_mode=TournamentMode.TRIPLETTE,
     )
 
     # Should have penalty for fallback format
-    # Penalty is 4 points per player in fallback format
-    # 4 players * 4 points = 16
-    assert score >= 16.0
+    # Penalty is 1.5 points per player in fallback format
+    # 4 players * 1.5 points = 6
+    assert score >= 6.0
 
 
 def test_score_no_violations() -> None:
     """Test scoring with no violations."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # First match
     match1 = Match(
@@ -243,7 +239,7 @@ def test_score_no_violations() -> None:
         team_a_player_ids=[1, 2, 3],
         team_b_player_ids=[4, 5, 6],
     )
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # Score a completely different match (no repeated players, different terrain)
     score = tracker.score_match(
@@ -251,7 +247,6 @@ def test_score_no_violations() -> None:
         team_b=[10, 11, 12],
         terrain="B",
         match_format=MatchFormat.TRIPLETTE,
-        tournament_mode=TournamentMode.TRIPLETTE,
     )
 
     # Should have no penalty
@@ -260,7 +255,7 @@ def test_score_no_violations() -> None:
 
 def test_score_multiple_violations() -> None:
     """Test scoring with multiple types of violations."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # First match
     match1 = Match(
@@ -270,7 +265,7 @@ def test_score_multiple_violations() -> None:
         team_a_player_ids=[1, 2, 3],
         team_b_player_ids=[4, 5, 6],
     )
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # Score a match with multiple violations:
     # - Players 1 and 2 together again (repeated partners)
@@ -281,20 +276,19 @@ def test_score_multiple_violations() -> None:
         team_b=[4, 8, 9],  # 1 vs 4 again
         terrain="A",  # Player 1 on A again
         match_format=MatchFormat.TRIPLETTE,
-        tournament_mode=TournamentMode.TRIPLETTE,
     )
 
     # Should have penalties for all violations
-    # Repeated partners: 10
-    # Repeated opponents: 5 (1 vs 4)
-    # Repeated terrain: 3 (player 1 on A)
-    # Total minimum: 18
-    assert score >= 18.0
+    # Repeated partners: 10 (squared count = 1^2 * 10 = 10)
+    # Repeated opponents: 5 (1 vs 4, squared count = 1^2 * 5 = 5)
+    # Repeated terrain: 2 (player 1 on A)
+    # Total minimum: 17
+    assert score >= 17.0
 
 
 def test_constraint_tracking_across_multiple_rounds() -> None:
     """Test constraint tracking accumulates correctly across multiple rounds."""
-    tracker = ConstraintTracker()
+    tracker = ConstraintTracker(TournamentMode.TRIPLETTE)
 
     # Round 1
     match1 = Match(
@@ -304,7 +298,7 @@ def test_constraint_tracking_across_multiple_rounds() -> None:
         team_a_player_ids=[1, 2, 3],
         team_b_player_ids=[4, 5, 6],
     )
-    tracker.add_match(match1, TournamentMode.TRIPLETTE)
+    tracker.add_match(match1)
 
     # Round 2
     match2 = Match(
@@ -314,7 +308,7 @@ def test_constraint_tracking_across_multiple_rounds() -> None:
         team_a_player_ids=[1, 7, 8],
         team_b_player_ids=[2, 9, 10],
     )
-    tracker.add_match(match2, TournamentMode.TRIPLETTE)
+    tracker.add_match(match2)
 
     # Player 1 has now:
     # - Played with: 2, 3, 7, 8
