@@ -5,19 +5,19 @@ These models are separate from persistence models for clean architecture.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class TournamentMode(str, Enum):
+class TournamentMode(StrEnum):
     """Tournament mode: TRIPLETTE or DOUBLETTE priority."""
 
     TRIPLETTE = "Triplette"
     DOUBLETTE = "Doublette"
 
 
-class MatchFormat(str, Enum):
+class MatchFormat(StrEnum):
     """Match format: triplette (3v3), doublette (2v2), or hybrid (3v2)."""
 
     TRIPLETTE = "Triplette"
@@ -25,7 +25,7 @@ class MatchFormat(str, Enum):
     HYBRID = "Hybride (3v2)"
 
 
-class PlayerRole(str, Enum):
+class PlayerRole(StrEnum):
     """Player roles in pétanque."""
 
     TIREUR = "Tireur"  # Shooter
@@ -33,7 +33,7 @@ class PlayerRole(str, Enum):
     MILIEU = "Milieu"  # Middle player
 
 
-class StorageBackend(str, Enum):
+class StorageBackend(StrEnum):
     """Storage backend type."""
 
     SQLMODEL = "SQLMODEL"
