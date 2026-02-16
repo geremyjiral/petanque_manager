@@ -181,7 +181,6 @@ class TournamentConfig(BaseModel):
     mode: TournamentMode = TournamentMode.TRIPLETTE
     rounds_count: int = Field(default=3, ge=1, le=10)
     terrains_count: int = Field(default=8, ge=1, le=52)  # Support up to ZZ
-    seed: int | None = None
     storage_backend: StorageBackend = StorageBackend.SQLMODEL
 
     # Database path (for SQLModel backend)
@@ -221,6 +220,7 @@ class ScheduleQualityReport(BaseModel):
 
     repeated_partners: int = 0  # Count of player pairs playing together >1 time
     repeated_opponents: int = 0  # Count of player pairs playing against each other >1 time
+    repeated_games: int = 0  # Count of player pairs playing together or against each other >1 time
     repeated_terrains: int = 0  # Count of players playing on same terrain >1 time
     fallback_format_count: int = 0  # Count of matches in fallback format
     total_score: float = 0.0  # Lower is better
@@ -262,3 +262,7 @@ class RoleRequirements(BaseModel):
     def total_needed(self) -> int:
         """Get total needed players (sum of all team members)."""
         return self.triplette_count * 3 + self.doublette_count * 2
+
+
+# Rebuild models with forward references now that all classes are defined
+Round.model_rebuild()

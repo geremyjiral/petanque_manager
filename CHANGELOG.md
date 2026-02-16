@@ -31,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Terrain labels A-Z, AA-ZZ (up to 702 terrains)
 - CSV export for rankings and schedules
 - Quality grading system for schedules (A+ to F)
-- Reproducible scheduling with optional seed control
 - Python 3.13+ support with modern type hints (PEP 604)
 - uv package manager integration
 - Makefile for common development tasks

@@ -160,31 +160,13 @@ def main() -> None:
             disabled=not can_edit,
         )
 
-        # seed = st.number_input(
-        #     "Graine aléatoire (optionnel)",
-        #     min_value=0,
-        #     value=config.seed or 0,
-        #     help="Définir une graine pour reproduire la génération des manches (0 = aléatoire)",
-        #     disabled=not can_edit,
-
-        # )
-
-    # storage_backend = st.selectbox(
-    #     "Backend de stockage",
-    #     options=[StorageBackend.SQLMODEL, StorageBackend.JSON],
-    #     index=0 if config.storage_backend == StorageBackend.SQLMODEL else 1,
-    #     help="SQLModel : base SQLite (recommandé)\nJSON : stockage en fichier (secours)",
-    #     disabled=not can_edit,
-    # )
     storage_backend = StorageBackend.SQLMODEL
-    seed = config.seed or 0
     if can_edit:
         if st.button("💾 Enregistrer la configuration", type="primary"):
             new_config = TournamentConfig(
                 mode=mode,
                 rounds_count=int(rounds_count),
                 terrains_count=int(terrains_count),
-                seed=int(seed) if seed > 0 else None,
                 storage_backend=storage_backend,
             )
 

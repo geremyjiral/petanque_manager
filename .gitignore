@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+typings/
 
 # Virtual environments
 venv/
@@ -26,6 +27,7 @@ ENV/
 env/
 .venv
 .uv/
+.env
 
 # IDEs
 .vscode/

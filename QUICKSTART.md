@@ -84,8 +84,7 @@ Bob Wilson,MILIEU
 ### Step 3: Generate Rounds (Schedule Page)
 1. Click "Generate Round"
 2. Review quality report (aim for A or B grade)
-3. If quality is poor, regenerate with different seed
-4. Repeat for each round
+3. Repeat for each round
 
 ### Step 4: Enter Results (Results Page)
 1. Select a round
@@ -114,7 +113,6 @@ Each team needs:
 ## 💡 Pro Tips
 
 ### Getting Quality Schedules
-- Use the seed option for reproducibility
 - Regenerate if quality grade is below B
 - More terrains = better scheduling flexibility
 
@@ -140,9 +138,6 @@ Each team needs:
 
 **"Role counts don't match"**
 → Check role requirements on home page, add needed roles
-
-**Schedule quality is poor**
-→ Try different seed or adjust player count
 
 **Can't login**
 → Check secrets in `.streamlit/secrets.toml`

@@ -1,6 +1,7 @@
 """Page de génération et d'affichage du planning."""
 
 import io
+from typing import Any
 
 import pandas as pd
 import streamlit as st
@@ -75,6 +76,7 @@ def main() -> None:
                                 - En cas de partenaires répétés : pénalité de {ConfigScoringMatchs.repeated_partners_penalty} points par paire
                                 - En cas d'adversaires répétés : pénalité de {ConfigScoringMatchs.repeated_opponents_penalty} points par paire
                                 - En cas de terrains répétés : pénalité de {ConfigScoringMatchs.repeated_terrains_penalty} points par joueur
+                                - En cas de joueurs jouant dans une même partie plus d'une fois : pénalité de {ConfigScoringMatchs.repeated_same_match_penalty} points par paire
                                 - En cas de format alternatif : pénalité de {ConfigScoringMatchs.fallback_format_penalty_per_player} points par joueur
                                 - Note finale basée sur le score total :
                                     - A+ : 0 points
@@ -94,6 +96,8 @@ def main() -> None:
                                     "Score": f"{r.quality_report.total_score:.1f}",
                                     "Partenaires répétés": r.quality_report.repeated_partners,
                                     "Adversaires répétés": r.quality_report.repeated_opponents,
+                                    "Joueurs présents dans une même partie plus d'une fois": r.quality_report.repeated_games,
+                                    "Terrains répétés": r.quality_report.repeated_terrains,
                                     "Format alternatif": r.quality_report.fallback_format_count,
                                 }
                             )
@@ -138,57 +142,48 @@ def main() -> None:
                     """
                     )
 
-                    # # Options de génération
-                    # use_custom_seed = st.checkbox(
-                    #     "Utiliser une graine personnalisée pour cette manche",
-                    #     value=False,
-                    #     help="Remplace la graine globale uniquement pour cette manche",
-                    # )
-
-                    custom_seed = None
-                    # if use_custom_seed:
-                    #     custom_seed = st.number_input(
-                    #         "Graine de la manche",
-                    #         min_value=0,
-                    #         value=0,
-                    #     )
-
+                    attempts_max = st.number_input(
+                        "Nombre de tentatives pour trouver une bonne manche",
+                        min_value=100,
+                        max_value=10_000,
+                        value=500,
+                        step=100,
+                        help="Plus de tentatives peuvent améliorer la qualité du tirage, mais prendront plus de temps à générer.",
+                    )
                     if st.button("🎲 Générer la manche", type="primary"):
                         try:
                             # Create placeholders for progress feedback
-                            progress_bar = st.progress(0)
                             status_text = st.empty()
-
-                            def progress_callback(
-                                attempt: int, total: int, best_score: float
-                            ) -> None:
-                                """Update progress UI during generation."""
-                                progress = attempt / total
-                                progress_bar.progress(progress)
-                                status_text.text(
-                                    f"🔄 Recherche de la meilleure combinaison... "
-                                    f"(tentative {attempt}/{total}, score: {best_score:.0f})"
-                                )
 
                             status_text.text("🔄 Initialisation de la génération...")
 
                             scheduler = TournamentScheduler(
                                 mode=config.mode,
                                 terrains_count=config.terrains_count,
-                                seed=custom_seed if custom_seed else config.seed,
                             )
 
-                            round_obj, quality_report, attempts = scheduler.generate_round(
-                                players=players,
-                                round_index=next_round_index,
-                                previous_rounds=rounds,
-                                progress_callback=progress_callback,
+                            chart_placeholder = st.empty()
+
+                            round_obj, quality_report, attempts, score_history, phase_history = (
+                                scheduler.generate_round(
+                                    players=players,
+                                    round_index=next_round_index,
+                                    previous_rounds=rounds,
+                                    attempts=attempts_max,
+                                    on_score=lambda scores, phases: update_chart(
+                                        scores, phases, chart_placeholder
+                                    ),
+                                )
                             )
+                            # Final chart update with all data
+                            update_chart(score_history, phase_history, chart_placeholder)
+
                             st.session_state["quality_report"] = quality_report
                             st.session_state["generation_attempts"] = attempts
+                            st.session_state["score_history"] = score_history
+                            st.session_state["phase_history"] = phase_history
 
                             # Clear progress indicators
-                            progress_bar.empty()
                             status_text.empty()
 
                             # Sauvegarde
@@ -215,7 +210,8 @@ def main() -> None:
                             quality_col3,
                             quality_col4,
                             quality_col5,
-                        ) = st.columns(5)
+                            quality_col6,
+                        ) = st.columns(6)
 
                         with quality_col1:
                             st.metric("Note", quality_report_prev.quality_grade)
@@ -236,12 +232,19 @@ def main() -> None:
 
                         with quality_col4:
                             st.metric(
+                                "Joueurs présents dans une même partie plus d'une fois",
+                                quality_report_prev.repeated_games,
+                                help="Paires de joueurs jouant dans une même partie plus d'une fois",
+                            )
+
+                        with quality_col5:
+                            st.metric(
                                 "Terrains répétés",
                                 quality_report_prev.repeated_terrains,
                                 help="Joueurs jouant sur le même terrain plus d’une fois",
                             )
 
-                        with quality_col5:
+                        with quality_col6:
                             st.metric(
                                 "Matchs en format alternatif",
                                 quality_report_prev.fallback_format_count,
@@ -253,10 +256,12 @@ def main() -> None:
                         elif quality_report_prev.quality_grade == "C":
                             st.info("👍 Bonne qualité de planning")
                         else:
-                            st.warning(
-                                "⚠️ La qualité du planning pourrait être améliorée. "
-                                "Essayez de régénérer avec une autre graine (seed)."
-                            )
+                            st.warning("⚠️ La qualité du planning pourrait être améliorée. ")
+                if "score_history" in st.session_state:
+                    st.subheader("📈 Historique des scores pendant la génération")
+                    score_history_prev: list[float] = st.session_state["score_history"]
+                    phase_history_prev: list[str] = st.session_state["phase_history"]
+                    update_chart(score_history_prev, phase_history_prev, st.empty())
 
     else:
         st.info(
@@ -308,7 +313,8 @@ def main() -> None:
                         qr_col3,
                         qr_col4,
                         qr_col5,
-                    ) = st.columns(5)
+                        qr_col6,
+                    ) = st.columns(6)
 
                     with qr_col1:
                         st.metric("Note", round_obj.quality_report.quality_grade)
@@ -329,12 +335,19 @@ def main() -> None:
 
                     with qr_col4:
                         st.metric(
+                            "Joueurs présents dans une même partie plus d'une fois",
+                            round_obj.quality_report.repeated_games,
+                            help="Paires de joueurs jouant dans une même partie plus d'une fois",
+                        )
+
+                    with qr_col5:
+                        st.metric(
                             "Terrains répétés",
                             round_obj.quality_report.repeated_terrains,
                             help="Joueurs jouant sur le même terrain plus d'une fois",
                         )
 
-                    with qr_col5:
+                    with qr_col6:
                         st.metric(
                             "Matchs en format alternatif",
                             round_obj.quality_report.fallback_format_count,
@@ -543,26 +556,35 @@ def main() -> None:
 def bag_quality_warning(rounds: list[Round], players_by_id: dict[int, Player]) -> None:
     players_partners: dict[int, dict[int, int]] = {}
     players_opponents: dict[int, dict[int, int]] = {}
+    players_same_match: dict[int, dict[int, int]] = {}
     for r in rounds:
         for m in r.matches:
             for pid in m.team_a_player_ids:
                 if pid not in players_partners:
                     players_partners[pid] = {}
-                for partner in set(m.team_a_player_ids) - {pid}:
-                    players_partners[pid][partner] = players_partners[pid].get(partner, 0) + 1
                 if pid not in players_opponents:
                     players_opponents[pid] = {}
+                if pid not in players_same_match:
+                    players_same_match[pid] = {}
+                for partner in set(m.team_a_player_ids) - {pid}:
+                    players_partners[pid][partner] = players_partners[pid].get(partner, 0) + 1
                 for opponent in set(m.team_b_player_ids):
                     players_opponents[pid][opponent] = players_opponents[pid].get(opponent, 0) + 1
+                for same in set(m.team_a_player_ids + m.team_b_player_ids) - {pid}:
+                    players_same_match[pid][same] = players_same_match[pid].get(same, 0) + 1
             for pid in m.team_b_player_ids:
                 if pid not in players_partners:
                     players_partners[pid] = {}
-                for partner in set(m.team_b_player_ids) - {pid}:
-                    players_partners[pid][partner] = players_partners[pid].get(partner, 0) + 1
                 if pid not in players_opponents:
                     players_opponents[pid] = {}
+                if pid not in players_same_match:
+                    players_same_match[pid] = {}
+                for partner in set(m.team_b_player_ids) - {pid}:
+                    players_partners[pid][partner] = players_partners[pid].get(partner, 0) + 1
                 for opponent in set(m.team_a_player_ids):
                     players_opponents[pid][opponent] = players_opponents[pid].get(opponent, 0) + 1
+                for same in set(m.team_a_player_ids + m.team_b_player_ids) - {pid}:
+                    players_same_match[pid][same] = players_same_match[pid].get(same, 0) + 1
     partners_warnings: set[tuple[int, int]] = set()
     for p, partners in players_partners.items():
         for partner, count in partners.items():
@@ -577,19 +599,73 @@ def bag_quality_warning(rounds: list[Round], players_by_id: dict[int, Player]) -
                 if (min(p, opponent), max(p, opponent)) not in opponents_warnings:
                     opponents_warnings.add((min(p, opponent), max(p, opponent)))
 
-    with st.container(border=True):
-        st.warning("⚠️ Partenaires similaires !")
-        for p1, p2 in partners_warnings:
-            name1 = players_by_id[p1].name if p1 in players_by_id else f"Joueur {p1}"
-            name2 = players_by_id[p2].name if p2 in players_by_id else f"Joueur {p2}"
-            st.warning(f"Les joueurs {name1} et {name2} seront partenaires plusieurs fois.")
+    same_match_warnings: set[tuple[int, int]] = set()
+    for p, same_matches in players_same_match.items():
+        for same, count in same_matches.items():
+            if count > 1:
+                if (min(p, same), max(p, same)) not in same_match_warnings:
+                    same_match_warnings.add((min(p, same), max(p, same)))
+    if partners_warnings:
+        with st.container(border=True):
+            st.subheader("**⚠️ Partenaires similaires !**")
+            for p1, p2 in partners_warnings:
+                name1 = players_by_id[p1].name if p1 in players_by_id else f"Joueur {p1}"
+                name2 = players_by_id[p2].name if p2 in players_by_id else f"Joueur {p2}"
+                st.warning(f"Les joueurs {name1} et {name2} seront partenaires plusieurs fois.")
+    if opponents_warnings:
+        with st.container(border=True):
+            st.subheader("**⚠️ Adversaires similaires !**")
+            for p1, p2 in opponents_warnings:
+                name1 = players_by_id[p1].name if p1 in players_by_id else f"Joueur {p1}"
+                name2 = players_by_id[p2].name if p2 in players_by_id else f"Joueur {p2}"
+                st.warning(f"Les joueurs {name1} et {name2} vont s'affronter plusieurs fois.")
 
-    with st.container(border=True):
-        st.warning("⚠️ Adversaires similaires !")
-        for p1, p2 in opponents_warnings:
-            name1 = players_by_id[p1].name if p1 in players_by_id else f"Joueur {p1}"
-            name2 = players_by_id[p2].name if p2 in players_by_id else f"Joueur {p2}"
-            st.warning(f"⚠️ Les joueurs {name1} et {name2} vont s'affronter plusieurs fois.")
+    if same_match_warnings:
+        with st.container(border=True):
+            st.subheader("**⚠️ Joueurs jouant dans une même partie plusieurs fois !**")
+            for p1, p2 in same_match_warnings:
+                name1 = players_by_id[p1].name if p1 in players_by_id else f"Joueur {p1}"
+                name2 = players_by_id[p2].name if p2 in players_by_id else f"Joueur {p2}"
+                st.warning(
+                    f"Les joueurs {name1} et {name2} joueront dans une même partie plusieurs fois."
+                )
+
+
+def update_chart(scores: list[float], phases: list[str], chart_placeholder: Any) -> None:
+    if len(scores) % 10 == 0 or len(scores) <= 5:
+        best_scores: list[float] = []
+        current_best = float("inf")
+        for s in scores:
+            current_best = min(current_best, s)
+            best_scores.append(current_best)
+
+        # Build long-format DataFrame: one row per data point
+        rows: list[dict[str, object]] = []
+        for i, (s, phase) in enumerate(zip(scores, phases, strict=True)):
+            rows.append({"Tentative": i, "Score": s, "Type": phase})
+        for i, b in enumerate(best_scores):
+            rows.append({"Tentative": i, "Score": b, "Type": "Meilleur score"})
+
+        df = pd.DataFrame(rows)
+
+        import altair as alt  # pyright: ignore[reportMissingImports]
+
+        chart = (
+            alt.Chart(df)  # pyright: ignore[reportUnknownMemberType]
+            .mark_circle(size=20)
+            .encode(
+                x=alt.X("Tentative:Q"),
+                y=alt.Y("Score:Q"),
+                color=alt.Color(
+                    "Type:N",
+                    scale=alt.Scale(
+                        domain=["Exploration", "Exploitation", "Meilleur score"],
+                        range=["#ff6b6b", "#ffa94d", "#51cf66"],
+                    ),
+                ),
+            )
+        )
+        chart_placeholder.altair_chart(chart, use_container_width=True)  # pyright: ignore[reportUnknownMemberType]
 
 
 if __name__ == "__main__":

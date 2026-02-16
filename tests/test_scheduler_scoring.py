@@ -128,10 +128,12 @@ def test_scheduler_generates_valid_round_doublette() -> None:
 
         scheduler = TournamentScheduler(mode=TournamentMode.DOUBLETTE, terrains_count=8)
 
-        round_obj, _quality_report, _attempts = scheduler.generate_round(
-            players=players,
-            round_index=0,
-            previous_rounds=[],
+        round_obj, _quality_report, _attempts, _score_history, _phase_history = (
+            scheduler.generate_round(
+                players=players,
+                round_index=0,
+                previous_rounds=[],
+            )
         )
 
         format_counts = {
@@ -160,10 +162,12 @@ def test_scheduler_generates_valid_round_triplette() -> None:
 
         scheduler = TournamentScheduler(mode=TournamentMode.TRIPLETTE, terrains_count=8)
 
-        round_obj, _quality_report, _attempts = scheduler.generate_round(
-            players=players,
-            round_index=0,
-            previous_rounds=[],
+        round_obj, _quality_report, _attempts, _score_history, _phase_history = (
+            scheduler.generate_round(
+                players=players,
+                round_index=0,
+                previous_rounds=[],
+            )
         )
 
         format_counts = {
@@ -342,10 +346,9 @@ def test_scheduler_generates_valid_round() -> None:
     scheduler = TournamentScheduler(
         mode=TournamentMode.TRIPLETTE,
         terrains_count=8,
-        seed=42,
     )
 
-    round_obj, quality_report, _attempts = scheduler.generate_round(
+    round_obj, quality_report, _attempts, _score_history, _phase_history = scheduler.generate_round(
         players=players,
         round_index=0,
         previous_rounds=[],
@@ -390,17 +393,18 @@ def test_scheduler_multiple_rounds_minimize_repetitions() -> None:
     scheduler = TournamentScheduler(
         mode=TournamentMode.TRIPLETTE,
         terrains_count=8,
-        seed=42,
     )
 
     rounds: list[Round] = []
 
     # Generate 3 rounds
     for i in range(3):
-        round_obj, quality_report, _attempts = scheduler.generate_round(
-            players=players,
-            round_index=i,
-            previous_rounds=rounds,
+        round_obj, quality_report, _attempts, _score_history, _phase_history = (
+            scheduler.generate_round(
+                players=players,
+                round_index=i,
+                previous_rounds=rounds,
+            )
         )
         rounds.append(round_obj)
 
@@ -439,14 +443,15 @@ def test_scheduler_handles_uneven_player_count() -> None:
     scheduler = TournamentScheduler(
         mode=TournamentMode.TRIPLETTE,
         terrains_count=8,
-        seed=42,
     )
 
     # Should not raise error
-    round_obj, _quality_report, _attempts = scheduler.generate_round(
-        players=players,
-        round_index=0,
-        previous_rounds=[],
+    round_obj, _quality_report, _attempts, _score_history, _phase_history = (
+        scheduler.generate_round(
+            players=players,
+            round_index=0,
+            previous_rounds=[],
+        )
     )
 
     # Should have generated some matches

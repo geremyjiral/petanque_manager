@@ -72,7 +72,6 @@ class ConfigDB(SQLModel, table=True):
     mode: str
     rounds_count: int
     terrains_count: int
-    seed: int | None = None
     storage_backend: str
     db_path: str
     json_path: str
@@ -111,7 +110,6 @@ class SQLModelStorage(TournamentStorage):
                 mode=config.mode.value,
                 rounds_count=config.rounds_count,
                 terrains_count=config.terrains_count,
-                seed=config.seed,
                 storage_backend=config.storage_backend.value,
                 db_path=config.db_path,
                 json_path=config.json_path,
@@ -130,7 +128,6 @@ class SQLModelStorage(TournamentStorage):
                 mode=TournamentMode(config_db.mode),
                 rounds_count=config_db.rounds_count,
                 terrains_count=config_db.terrains_count,
-                seed=config_db.seed,
                 storage_backend=StorageBackend(config_db.storage_backend),
                 db_path=config_db.db_path,
                 json_path=config_db.json_path,

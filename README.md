@@ -28,7 +28,6 @@ A production-quality **Streamlit** application for managing pétanque tournament
   - Repeated terrain assignments (medium penalty)
   - Fallback format usage (medium penalty)
 - Quality grading system (A+ to F) for generated schedules
-- Reproducible scheduling with optional seed control
 - Support for 4-80+ players
 
 ### 📊 Live Rankings
@@ -129,7 +128,6 @@ petanque_manager/
 │   │   └── auth.py           # Authentication
 │   └── utils/                 # Utilities
 │       ├── terrain_labels.py # A-Z, AA-ZZ generation
-│       └── seed.py           # Random seed management
 ├── tests/                     # Test suite
 │   ├── test_scheduler_scoring.py
 │   ├── test_constraints_tracking.py
@@ -189,7 +187,6 @@ Configure via the web UI (requires admin login):
 - **Mode**: TRIPLETTE or DOUBLETTE
 - **Number of Rounds**: 1-10
 - **Number of Terrains**: 1-52 (A-Z, AA-ZZ)
-- **Random Seed**: Optional for reproducibility
 - **Storage Backend**: SQLModel or JSON
 
 ## ☁️ Deployment
@@ -302,7 +299,6 @@ uv run mypy src/ app.py pages/
 - Navigate to **Schedule** page
 - Click "Generate Round"
 - Review quality report (A+ to F grade)
-- If quality is poor, regenerate with a different seed
 - Repeat for all rounds
 
 ### 4. Enter Results
@@ -327,7 +323,6 @@ The scheduler uses a heuristic search algorithm that:
 
 1. **Generates candidate schedules** by forming teams with correct role compositions
 2. **Scores each schedule** based on constraint violations
-3. **Tries multiple seeds** (up to 50 attempts) to find the best schedule
 4. **Returns the schedule with the lowest penalty score**
 
 ### Penalty Weights

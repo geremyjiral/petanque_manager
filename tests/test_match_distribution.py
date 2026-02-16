@@ -190,9 +190,11 @@ class TestHybridMatchGeneration:
     def test_5_players_generates_hybrid_match(self):
         """Test that 5 players generates a hybrid 3v2 match."""
         players = self.create_players(5)
-        scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
+        scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5)
 
-        round_obj, _quality_report, _attempts = scheduler.generate_round(players, 0, [])
+        round_obj, __quality_report, __attempts, _score_history, _phase_history = (
+            scheduler.generate_round(players, 0, [])
+        )
 
         # Should have 1 match
         assert len(round_obj.matches) == 1
@@ -208,9 +210,11 @@ class TestHybridMatchGeneration:
     def test_10_players_all_play(self):
         """Test that all 10 players are assigned to matches."""
         players = self.create_players(10)
-        scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
+        scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5)
 
-        round_obj, _quality_report, _attempts = scheduler.generate_round(players, 0, [])
+        round_obj, __quality_report, __attempts, _score_history, _phase_history = (
+            scheduler.generate_round(players, 0, [])
+        )
 
         # Count total players in all matches
         all_player_ids: set[int] = set()
@@ -224,9 +228,11 @@ class TestHybridMatchGeneration:
     def test_11_players_all_play(self):
         """Test that all 11 players are assigned (likely 1x3v3 + 1x3v2)."""
         players = self.create_players(11)
-        scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5, seed=42)
+        scheduler = TournamentScheduler(TournamentMode.TRIPLETTE, terrains_count=5)
 
-        round_obj, _quality_report, _attempts = scheduler.generate_round(players, 0, [])
+        round_obj, __quality_report, __attempts, _score_history, _phase_history = (
+            scheduler.generate_round(players, 0, [])
+        )
 
         # Count total players in all matches
         all_player_ids: set[int] = set()

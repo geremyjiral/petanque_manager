@@ -16,6 +16,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import combinations
 
+from stqdm import stqdm  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
+
 from src.petanque_manager.core.models import (
     Match,
     MatchFormat,
@@ -26,7 +28,6 @@ from src.petanque_manager.core.models import (
     ScheduleQualityReport,
     TournamentMode,
 )
-from src.petanque_manager.utils.seed import set_random_seed
 from src.petanque_manager.utils.terrain_labels import get_terrain_label
 
 
@@ -41,9 +42,10 @@ class ConstraintLevel:
 class ConfigScoringMatchs:
     """Configuration for scoring matches."""
 
-    repeated_partners_penalty: float = 10.0
-    repeated_opponents_penalty: float = 5.0
-    repeated_terrains_penalty: float = 2.0
+    repeated_partners_penalty: int = 10
+    repeated_opponents_penalty: int = 5
+    repeated_same_match_penalty: int = 3
+    repeated_terrains_penalty: int = 1
     fallback_format_penalty_per_player: float = 1.5
 
 
@@ -111,6 +113,23 @@ class ConstraintTracker:
                 for pid in match.all_player_ids:
                     fallback_formats[pid] += 1
         return fallback_formats
+
+    @property
+    def same_match_counts(self) -> dict[tuple[int, int], int]:
+        """Get same match counts. Count of times two players have been in the same match (as partners or opponents)."""
+        same_match_counts: dict[tuple[int, int], int] = defaultdict(int)
+        for match in self.matches:
+            all_ids = match.all_player_ids
+            for i, pid1 in enumerate(all_ids):
+                for pid2 in all_ids[i + 1 :]:
+                    pair = (min(pid1, pid2), max(pid1, pid2))
+                    same_match_counts[pair] += 1
+        return same_match_counts
+
+    def get_same_match_count(self, pid1: int, pid2: int) -> int:
+        """Get number of times two players have been in the same match."""
+        pair = (min(pid1, pid2), max(pid1, pid2))
+        return self.same_match_counts[pair]
 
     @property
     def partner_counts(self) -> dict[tuple[int, int], int]:
@@ -197,6 +216,14 @@ class ConstraintTracker:
                 count = self.get_opponent_count(pid_a, pid_b)
                 if count > 0:
                     score += ConfigScoringMatchs.repeated_opponents_penalty * (count**2)
+
+        # Check repeated same match (any two players in the same match again)
+        all_players = team_a + team_b
+        for i, pid1 in enumerate(all_players):
+            for pid2 in all_players[i + 1 :]:
+                count = self.get_same_match_count(pid1, pid2)
+                if count > 0:
+                    score += ConfigScoringMatchs.repeated_same_match_penalty * (count**2)
 
         # Check repeated terrains (medium penalty: 2 points per violation)
         terrains = self.terrains
@@ -374,22 +401,16 @@ class TournamentScheduler:
         self,
         mode: TournamentMode,
         terrains_count: int,
-        seed: int | None = None,
     ):
         """Initialize scheduler.
 
         Args:
             mode: Tournament mode (TRIPLETTE or DOUBLETTE)
             terrains_count: Number of available terrains
-            seed: Random seed for reproducibility
         """
         self.mode = mode
         self.terrains_count = terrains_count
-        self.seed = seed
         self.tracker = ConstraintTracker(mode)
-
-        if seed is not None:
-            set_random_seed(seed)
 
     def generate_round(
         self,
@@ -397,20 +418,19 @@ class TournamentScheduler:
         round_index: int,
         previous_rounds: list[Round],
         attempts: int = 500,
-        progress_callback: Callable[[int, int, float], None] | None = None,
-    ) -> tuple[Round, ScheduleQualityReport, int]:
+        on_score: Callable[[list[float], list[str]], None] | None = None,
+    ) -> tuple[Round, ScheduleQualityReport, int, list[float], list[str]]:
         """Generate a single round with matches.
-
 
         Args:
             players: List of active players
             round_index: Index of this round (0-based)
             previous_rounds: Previously generated rounds
-            attempts: Number of shuffles to try (default: 100, balanced for quality/performance)
-            progress_callback: Optional callback(attempt, total_attempts, best_score) for progress updates
+            attempts: Number of shuffles to try (default: 500, balanced for quality/performance)
+            on_score: Optional callback(score_history, phase_history) called each time a new score is recorded
 
         Returns:
-            Tuple of (generated round, quality report)
+            Tuple of (generated round, quality report, attempts used, score history, phase history)
 
         Raises:
             ValueError: If unable to generate valid round
@@ -428,35 +448,52 @@ class TournamentScheduler:
         if player_count < 4:
             raise ValueError("Need at least 4 players to generate matches")
 
-        players_by_role: dict[PlayerRole, list[Player]] = {
-            PlayerRole.TIREUR: [],
-            PlayerRole.POINTEUR: [],
-            PlayerRole.MILIEU: [],
-        }
-        for player in players:
-            for role in player.roles:
-                players_by_role[role].append(player)
-
-        # Store in instance for use in _form_team
-        self._players_by_role = players_by_role
-
-        # Shuffle players for variety
-        shuffled_players = players.copy()
-        random.shuffle(shuffled_players)
-
         # Try multiple times to find best schedule
+        # Phase 1: Random exploration (full shuffles)
+        # Phase 2: Local search (swap 2 players in best solution to refine)
         best_matches: list[Match] | None = None
+        best_order: list[Player] | None = None
         best_score = float("inf")
+        score_history: list[float] = []
+        phase_history: list[str] = []
 
         good_enough_threshold = 10.0
-        min_attempts_before_early_stop = 100  # Minimum attempts before considering early stop
+        min_attempts_before_early_stop = 100
+        exploration_ratio = 0.3  # 30% exploration, 70% local search
+
         attempt = 0
-        for attempt in range(attempts):
-            if attempt > 0:
+        pbar = stqdm(  # pyright: ignore[reportUnknownVariableType]
+            range(attempts),
+            desc=f"Generating round... Current best score : {best_score:.1f}",
+            unit="attempt",
+        )
+        for attempt in pbar:  # pyright: ignore[reportUnknownVariableType]
+            if not isinstance(attempt, int):
+                raise ValueError("Expected attempt to be an integer")
+
+            # Decide strategy: explore or exploit
+            is_exploration = best_order is None or attempt < int(attempts * exploration_ratio)
+            if is_exploration or best_order is None:
+                # Phase 1: Full random shuffle (exploration)
+                shuffled_players = players.copy()
                 random.shuffle(shuffled_players)
+            else:
+                # Phase 2: Local mutation from best known order (exploitation)
+                shuffled_players = best_order.copy()
+                # Swap 2 random players to explore neighborhood
+                n = len(shuffled_players)
+                i, j = random.sample(range(n), 2)
+                shuffled_players[i], shuffled_players[j] = shuffled_players[j], shuffled_players[i]
+                # Occasionally do a larger perturbation (swap 2 more pairs)
+                if random.random() < 0.2:
+                    for _ in range(2):
+                        i, j = random.sample(range(n), 2)
+                        shuffled_players[i], shuffled_players[j] = (
+                            shuffled_players[j],
+                            shuffled_players[i],
+                        )
 
             temp_tracker = ConstraintTracker(self.mode)
-            # Copy previous rounds' constraints
             for prev_round in previous_rounds:
                 for match in prev_round.matches:
                     temp_tracker.add_match(match)
@@ -464,25 +501,27 @@ class TournamentScheduler:
                 matches = self._generate_matches_for_round(
                     shuffled_players, round_index, temp_tracker
                 )
-                score = self._score_matches_with_tracker(matches, temp_tracker)
+                # Score against tracker with only previous rounds (not current round's matches)
+                # to avoid each match penalizing its own partnerships/opponents
+                score = self._score_matches_with_tracker(matches, self.tracker)
+
+                score_history.append(score)
+                phase_history.append("Exploration" if is_exploration else "Exploitation")
+                if on_score is not None:
+                    on_score(score_history, phase_history)
 
                 if score < best_score:
                     best_score = score
                     best_matches = matches
-
-                    # Call progress callback if provided
-                    if progress_callback is not None:
-                        progress_callback(attempt + 1, attempts, best_score)
+                    best_order = shuffled_players.copy()
 
                 if score == 0:
-                    # Perfect score (A+) - no need to continue
                     break
                 if score < good_enough_threshold and attempt >= min_attempts_before_early_stop:
-                    # Grade A score after sufficient attempts - good enough
                     break
             except ValueError:
-                # This arrangement didn't work, try another
                 continue
+            pbar.set_description(f"Generating round... Current best score : {best_score:.0f}  | ")  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
 
         if best_matches is None:
             raise ValueError("Unable to generate valid round after multiple attempts")
@@ -491,7 +530,7 @@ class TournamentScheduler:
         quality_report = self._generate_quality_report(best_matches)
 
         round_obj = Round(index=round_index, matches=best_matches, quality_report=quality_report)
-        return round_obj, quality_report, attempt + 1
+        return round_obj, quality_report, attempt + 1, score_history, phase_history
 
     def generate_round_deterministic(
         self,
@@ -1070,40 +1109,30 @@ class TournamentScheduler:
                 # TRIPLETTE mode with doublette fallback: 1 TIREUR + 1 (POINTEUR or MILIEU)
                 needed_roles = [PlayerRole.TIREUR, [PlayerRole.POINTEUR, PlayerRole.MILIEU]]
 
-        available_ids = {p.id for p in available_players if p.id is not None}
         team: list[Player] = []
-        used_ids: set[int] = set()  # Track used player IDs to avoid duplicates
+        used_ids: set[int] = set()
 
         for needed_role in needed_roles:
             player = None
 
-            # Handle both single role and list of alternative roles
+            # Iterate through available_players in order (order = source of randomness)
             if isinstance(needed_role, list):
-                # Try each role in priority order
-                for role in needed_role:
-                    candidates = self._players_by_role.get(role, []).copy()
-                    random.shuffle(candidates)
-
-                    for candidate in candidates:
-                        if (
-                            candidate.id is not None
-                            and candidate.id in available_ids
-                            and candidate.id not in used_ids
-                        ):
-                            player = candidate
-                            break
-                    if player is not None:
-                        break
-            else:
-                # Single specific role
-                candidates = self._players_by_role.get(needed_role, []).copy()
-                random.shuffle(candidates)
-
-                for candidate in candidates:
+                # Alternative roles: accept the first player matching any of them
+                for candidate in available_players:
                     if (
                         candidate.id is not None
-                        and candidate.id in available_ids
                         and candidate.id not in used_ids
+                        and any(role in candidate.roles for role in needed_role)
+                    ):
+                        player = candidate
+                        break
+            else:
+                # Single required role
+                for candidate in available_players:
+                    if (
+                        candidate.id is not None
+                        and candidate.id not in used_ids
+                        and needed_role in candidate.roles
                     ):
                         player = candidate
                         break
@@ -1163,6 +1192,7 @@ class TournamentScheduler:
         # Count violations using tracker's count methods for accuracy
         repeated_partners = 0
         repeated_opponents = 0
+        repeated_games = 0
         repeated_terrains = 0
         fallback_count = 0
 
@@ -1170,6 +1200,7 @@ class TournamentScheduler:
         partners = self.tracker.partners
         opponents = self.tracker.opponents
         terrains = self.tracker.terrains
+        same_match_counts = self.tracker.same_match_counts
 
         for match in matches:
             # Check partners - count pairs that already exist in tracker
@@ -1191,6 +1222,13 @@ class TournamentScheduler:
                 if match.terrain_label in terrains.get(pid, set()):
                     repeated_terrains += 1
 
+            # Check repeated same match (any two players in the same match again)
+            for i, pid1 in enumerate(match.all_player_ids):
+                for pid2 in match.all_player_ids[i + 1 :]:
+                    count = same_match_counts.get((min(pid1, pid2), max(pid1, pid2)), 0)
+                    if count > 0:
+                        repeated_games += 1
+
             # Check fallback/hybrid
             # Hybrid is always considered a "fallback" (compromise)
             # Pure wrong format is also a fallback
@@ -1209,6 +1247,7 @@ class TournamentScheduler:
             repeated_partners=repeated_partners,
             repeated_opponents=repeated_opponents,
             repeated_terrains=repeated_terrains,
+            repeated_games=repeated_games,
             fallback_format_count=fallback_count,
             total_score=total_score,
         )
