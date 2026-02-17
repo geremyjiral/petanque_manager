@@ -665,7 +665,7 @@ def update_chart(scores: list[float], phases: list[str], chart_placeholder: Any)
                 ),
             )
         )
-        chart_placeholder.altair_chart(chart, use_container_width=True)  # pyright: ignore[reportUnknownMemberType]
+        chart_placeholder.altair_chart(chart, width="stretch")  # pyright: ignore[reportUnknownMemberType]
 
 
 if __name__ == "__main__":
